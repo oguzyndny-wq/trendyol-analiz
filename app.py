@@ -4,10 +4,10 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Kâr Analiz Paneli v3", layout="wide")
+st.set_page_config(page_title="Trendyol Ultra Kâr Analiz Paneli v4", layout="wide")
 
-st.title("📊 Trendyol Gelişmiş Kâr Analiz Paneli v3 (Maliyet & İade Motorlu)")
-st.markdown("Trendyol raporlarınızı yükleyin; sistem iade stoklarını, eksik maliyetli barkodları otomatik yönetsin.")
+st.title("🚀 Trendyol Ultra Kâr Analiz Paneli v4 (PRO)")
+st.markdown("Zarar eden ürün alarmları, iade kargo cezaları ve detaylı gider pastası entegre edilmiştir.")
 st.write("---")
 
 # 1. DOSYA YÜKLEME ALANLARI
@@ -31,9 +31,9 @@ st.write("---")
 reklam_gideri = st.number_input("🔗 Varsa Bu Aya Ait Toplam Reklam Giderini Giriş Yapın (TL):", min_value=0.0, value=0.0, step=100.0)
 
 # ANALİZİ BAŞLAT BUTONU
-if st.button("🚀 Analizi Başlat", use_container_width=True):
+if st.button("🚀 Detaylı Analizi Başlat", use_container_width=True):
     if finans_file and prod_file and maliyet_file:
-        with st.spinner("Gelişmiş maliyet ve iade optimizasyonu hesaplanıyor..."):
+        with st.spinner("Şirketinizin röntgeni çekiliyor, zararlar hesaplanıyor..."):
             
             # Verileri Oku
             df_finans = pd.read_excel(finans_file)
@@ -62,6 +62,7 @@ if st.button("🚀 Analizi Başlat", use_container_width=True):
             # Hesaplama Döngüsü
             sonuc_listesi = []
             eksik_maliyetler = set()
+            toplam_iade_kargo_zarari = 0
             
             for idx, row in df_prod.iterrows():
                 barkod = str(row['Barkod']).strip()
@@ -76,11 +77,11 @@ if st.button("🚀 Analizi Başlat", use_container_width=True):
                 if barkod == 'nan' or siparis_no == 'nan':
                     continue
                 
-                # 1. KONTROL: İPTAL DURUMU (Müşteri ürünü hiç almadıysa tamamen devre dışı bırak)
+                # İptal Durumu Kontrolü
                 if "iptal" in statü or "reddedildi" in statü:
                     continue
                 
-                # Maliyet Bilgisini Çek
+                # Maliyet Kontrolü
                 if barkod in maliyet_dict:
                     birim_maliyet = maliyet_dict[barkod]
                 else:
@@ -88,20 +89,16 @@ if st.button("🚀 Analizi Başlat", use_container_width=True):
                     eksik_maliyetler.add((barkod, urun_adi))
                 
                 toplam_maliyet = birim_maliyet * adet
-                
-                # 2. KONTROL: İADE DURUMU (Ürün geri geldiyse ciro sıfırlanır ama maliyet yükü kaldırılır)
                 is_iade = "iade" in statü
                 
                 if is_iade:
-                    # İade geldiyse bu satırdan ciro elde etmediniz (0 TL)
                     hesaplanan_ciro = 0
-                    # Ürün rafa geri döndüğü için maliyet zararınız yoktur (0 TL)
                     hesaplanan_maliyet = 0
                 else:
                     hesaplanan_ciro = satis_tutari
                     hesaplanan_maliyet = toplam_maliyet
                 
-                # Trendyol Finansal Kesintilerini Bölüştür
+                # Kesintileri Getir
                 bolunmus_komisyon = 0
                 bolunmus_kargo = 0
                 bolunmus_hizmet = 0
@@ -112,8 +109,12 @@ if st.button("🚀 Analizi Başlat", use_container_width=True):
                         bolunmus_komisyon = (f_data['komisyon'] / f_data['toplam_adet']) * adet
                         bolunmus_kargo = (f_data['kargo'] / f_data['toplam_adet']) * adet
                         bolunmus_hizmet = (f_data['hizmet'] / f_data['toplam_adet']) * adet
+                        
+                        # Eğer iade ise yediğimiz kargo bedeli bizim için saf zarardır
+                        if is_iade:
+                            toplam_iade_kargo_zarari += abs(bolunmus_kargo)
                 
-                # Net Kâr Formülü (İade ise ciro 0, maliyet 0 olur; sadece kargo/komisyon cezası kalır)
+                # Net Kâr Formülü
                 net_kar = hesaplanan_ciro + bolunmus_komisyon + bolunmus_kargo + bolunmus_hizmet - hesaplanan_maliyet
                 
                 sonuc_listesi.append({
@@ -121,7 +122,7 @@ if st.button("🚀 Analizi Başlat", use_container_width=True):
                     "Barkod": barkod,
                     "Marka": marka,
                     "Ürün Adı": urun_adi,
-                    "Durum": "İade Edildi" if is_iade else "Satış",
+                    "Durum": "İade" if is_iade else "Satış",
                     "Satış Adedi": adet,
                     "Net Ciro": hesaplanan_ciro,
                     "Komisyon": bolunmus_komisyon,
@@ -133,45 +134,78 @@ if st.button("🚀 Analizi Başlat", use_container_width=True):
                 
             df_sonuc = pd.DataFrame(sonuc_listesi)
             
-            # 📊 DASHBOARD METRİKLERİ
+            # 📊 METRİKLER
             toplam_ciro = df_sonuc['Net Ciro'].sum()
             toplam_kargo = df_sonuc['Kargo'].sum()
             toplam_komisyon = df_sonuc['Komisyon'].sum()
+            toplam_hizmet = df_sonuc['Hizmet Bedeli'].sum()
+            toplam_maliyet_gideri = df_sonuc['Ürün Maliyeti'].sum()
             genel_net_kar = df_sonuc['Net Kâr'].sum() - reklam_gideri
-            toplam_adet = df_sonuc[df_sonuc['Durum'] == 'Satış']['Satış Adedi'].sum()
             
-            # Özet Kartları
+            total_rows = len(df_sonuc)
+            iade_rows = len(df_sonuc[df_sonuc['Durum'] == 'İade'])
+            iade_orani = (iade_rows / total_rows) * 100 if total_rows > 0 else 0
+            
+            # Üst Özet Kartları
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("💰 Gerçekleşen Net Ciro (İadeler Düştü)", f"₺{toplam_ciro:,.2f}")
-            m2.metric("🟢 Gerçek Net Kâr (Maliyet & Reklam Optimize)", f"₺{genel_net_kar:,.2f}")
-            m3.metric("📦 Toplam Teslim Edilen Ürün", f"{int(toplam_adet)} Adet")
-            m4.metric("🚚 Toplam Kargo Maliyeti", f"₺{abs(toplam_kargo):,.2f}")
+            m1.metric("💰 Net Ciro (İadeler Hariç)", f"₺{toplam_ciro:,.2f}")
+            m2.metric("🟢 Gerçek Net Kâr", f"₺{genel_net_kar:,.2f}")
+            m3.metric("📦 Genel İade Oranı", f"%{iade_orani:.2f}")
+            m4.metric("🚨 İade Kargo Zararı", f"₺{toplam_iade_kargo_zarari:,.2f}")
+            
+            # 🛑 ÖZELLİK 1: ZARAR EDEN ÜRÜNLER ALARMI
+            df_urun_kar = df_sonuc.groupby(['Barkod', 'Marka', 'Ürün Adı']).agg({'Net Kâr':'sum', 'Satış Adedi':'sum'}).reset_index()
+            df_zarar_edenler = df_urun_kar[df_urun_kar['Net Kâr'] < 0].sort_values(by='Net Kâr')
+            
+            st.write("---")
+            if not df_zarar_edenler.empty:
+                st.error(f"🛑 DİKKAT: Sattıkça Zarar Ettiren {len(df_zarar_edenler)} Adet Ürün Tespit Edildi! (Acil Zam Yapılmalı)")
+                st.dataframe(df_zarar_edenler.style.format({'Net Kâr': '₺{:.2f}'}), use_container_width=True)
+            else:
+                st.success("✅ Tebrikler! Sattıkça zarar ettiren hiçbir ürününüz bulunmuyor.")
+            
+            # 💸 ÖZELLİK 3: GİDER DAĞILIM PASTA GRAFİĞİ
+            st.write("---")
+            st.write("### 🍕 Toplam Cironun Gider Dağılım Röntgeni")
+            
+            gider_data = {
+                "Gider Kalemi": ["Net Kâr", "Ürün Maliyetleri", "Trendyol Komisyonu", "Kargo Giderleri", "Platform Hizmet & Reklam"],
+                "Tutar": [
+                    max(0, genel_net_kar),
+                    toplam_maliyet_gideri,
+                    abs(toplam_komisyon),
+                    abs(toplam_kargo),
+                    abs(toplam_hizmet) + reklam_gideri
+                ]
+            }
+            df_gider_pasta = pd.DataFrame(gider_data)
+            fig_pie = px.pie(df_gider_pasta, values='Tutar', names='Gider Kalemi', title="Cironuzun Dağılım Tablosu (%)", hole=0.4)
+            st.plotly_chart(fig_pie, use_container_width=True)
             
             # 🏢 Marka Analizi
-            st.write("### 🏢 Marka Bazlı Kârlılık Analizi")
+            st.write("---")
+            st.write("### 🏢 Marka Bazlı Detaylı Performans")
             df_marka = df_sonuc.groupby('Marka').agg({'Net Ciro':'sum', 'Net Kâr':'sum', 'Satış Adedi':'sum'}).reset_index()
             st.dataframe(df_marka.style.format({'Net Ciro': '₺{:.2f}', 'Net Kâr': '₺{:.2f}'}), use_container_width=True)
-            
-            fig = px.bar(df_marka, x='Marka', y='Net Kâr', title="Markaların Net Kâr Dağılımı", color='Marka')
-            st.plotly_chart(fig, use_container_width=True)
             
             # 🔍 EKSİK MALİYET DEDEKTİFİ
             if eksik_maliyetler:
                 st.write("---")
-                st.error("⚠️ Maliyet Listesinde Bulunmayan ve Kârı Sapıttıran Barkodlar (Acilen listenize ekleyin):")
+                st.warning("⚠️ Maliyet Listesinde Olmadığı İçin Kârı Yanıltan Barkodlar:")
                 df_eksik = pd.DataFrame(list(eksik_maliyetler), columns=["Barkod", "Ürün Adı"])
                 st.dataframe(df_eksik, use_container_width=True)
             
-            # Excel İndirme Butonu
+            # Excel İndirme
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_sonuc.to_excel(writer, index=False, sheet_name='Kâr Analiz Sonucu v3')
+                df_sonuc.to_excel(writer, index=False, sheet_name='Ultra Analiz v4')
             processed_data = output.getvalue()
             
+            st.write("---")
             st.download_button(
-                label="📥 Gelişmiş Sonuçları Excel Olarak İndir",
+                label="📥 Tüm Profesyonel Raporları Excel Olarak İndir",
                 data=processed_data,
-                file_name="Trendyol_Kar_Analizi_v3.xlsx",
+                file_name="Trendyol_Ultra_Analiz_v4.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
