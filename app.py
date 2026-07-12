@@ -28,7 +28,7 @@ with col3:
 st.write("---")
 
 # Reklam Gideri Giriş Alanı (İstediğiniz Ekstra Özellik)
-reklam_gideri = st.number_input("🔗 Varsa Bu Aya Ait Toplam Reklam Giderini Girin (TL):", min_value=0.0, value=0.0, step=100.0)
+reklam_gideri = st.number_input("🔗 Varsa Bu Aya Ait Toplam Reklam Giderini Giriş Yapın (TL):", min_value=0.0, value=0.0, step=100.0)
 
 # ANALİZİ BAŞLAT BUTONU
 if st.button("🚀 Analizi Başlat", use_container_width=True):
@@ -91,7 +91,7 @@ if st.button("🚀 Analizi Başlat", use_container_width=True):
                 toplam_maliyet = birim_maliyet * adet
                 
                 # Net Kâr (Trendyol kesintileri eksi değerde geldiği için matematiksel olarak topluyoruz)
-                net_kar = satis_tutari + bolunmus_komisyon + bolunmus_kargo + bolunmus_hizmet - toplamMaliyet
+                net_kar = satis_tutari + bolunmus_komisyon + bolunmus_kargo + bolunmus_hizmet - toplam_maliyet
                 
                 sonuc_listesi.append({
                     "Barkod": barkod,
