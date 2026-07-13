@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Konsolide Finansal ERP v25.1", layout="wide")
-st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v25.1")
-st.markdown("Amazon sipariş detaylarındaki negatif sayı bölme hatası mutlak değer (abs) süzgeciyle tamamen düzeltilmiş kesin sürüm.")
+st.set_page_config(page_title="Konsolide Finansal ERP v25.2", layout="wide")
+st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v25.2")
+st.markdown("Amazon sipariş detaylarındaki kâr/zarar formül çakışması ve veri temizleme sırası tamamen düzeltilmiş kesin sürüm.")
 st.write("---")
 
 # Sayı Temizleme Fonksiyonları
@@ -22,7 +22,6 @@ def parse_amazon_clean(val, force_int=False):
         except: return 0.0
     try:
         num = float(s.replace(',', '.'))
-        # 🎯 KESİN ÇÖZÜM: Mutlak değer kontrolü sayesinde eksi rakamlar da başarıyla bölünür
         if not force_int and abs(num) > 100000:
             return num / 10000.0
         return num
@@ -221,7 +220,6 @@ if baslat_btn:
             st.session_state['amz_kar'] = amz_k_net - amz_m - amz_rek
             st.session_state['amz_sip_adet'] = len(df_as)
             st.session_state['amz_urun_adet'] = int(df_am['Satilan_Net_Birim'].sum())
-            
             st.session_state['amz_iade_adet'] = int(df_as['İade edilen birimler'].sum() if 'İade edilen birimler' in df_as.columns else 0)
             st.session_state['amz_iptal_adet'] = 0
             
@@ -231,19 +229,40 @@ if baslat_btn:
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Kâr / Zarar']
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
             
-            # Amazon Sipariş Detay Doğru Temizleme İstasyonu
+            # 🎯 AMAZON SİPARİŞ DETAY DÜZELTME VE FORMÜL İSTASYONU (KUSURSUZLAŞTIRILDI)
             amz_m_dict = dict(zip(df_am['Ana ürün ASIN\'i'].astype(str).str.strip(), df_am['Birim Alış Maliyeti (₺)']))
-            df_as_goster = df_as[['Ana ürün ASIN\'i', 'Satılan birimler', 'İade edilen birimler', 'Satılan net birim sayısı', 'Satış', 'Toplam Net kazanç']].copy()
             
-            # 🎯 TÜM METRİKLER abs() DESTEKLİ TEMİZLENİYOR
-            df_as_goster['Toplam Net kazanç'] = df_as_goster['Toplam Net kazanç'].apply(parse_amazon_clean)
-            df_as_goster['Satış'] = df_as_goster['Satış'].apply(parse_amazon_clean)
-            
-            df_as_goster['Alış Maliyeti'] = df_as_goster.apply(lambda row: safe_f(amz_m_dict.get(str(row['Ana ürün ASIN\'i']).strip(), 0.0)) * safe_f(row['Satılan net birim sayısı']), axis=1)
-            df_as_goster['Toplam Kâr/Zarar'] = df_as_goster['Toplam Net kazanç'] - df_as_goster['Alış Maliyeti']
-            
-            df_as_goster.columns = ['ASIN/Barkod', 'Brüt Satış Adedi', 'İade Adedi', 'Net Satış Adedi', 'Ciro (Brüt)', 'Amazon Net Kazanç', 'Alış Maliyeti', 'Toplam Kâr/Zarar']
-            st.session_state['df_siparisler_amz'] = df_as_goster.sort_values(by='Toplam Kâr/Zarar', ascending=False).reset_index(drop=True)
+            # Geçici güvenli liste kuruyoruz
+            amz_gosterge_listesi = []
+            for idx, row in df_as.iterrows():
+                asin_kod = str(row['Ana ürün ASIN\'i']).strip()
+                brut_adet = safe_f(row.get('Satılan birimler', 0))
+                iade_adet = safe_f(row.get('İade edilen birimler', 0))
+                net_adet = safe_f(row.get('Satılan net birim sayısı', 0))
+                
+                # Temizlenmiş Net Kazanç ve Brüt Satış Ciro değerleri
+                temiz_net_kazanc = parse_amazon_clean(row.get('Toplam Net kazanç', 0.0))
+                temiz_ciro = parse_amazon_clean(row.get('Satış', 0.0))
+                
+                # Maliyet Hesabı (Net Adet * Birim Maliyet)
+                birim_maliyet = safe_f(amz_m_dict.get(asin_kod, 0.0))
+                toplam_alis_maliyeti = birim_maliyet * net_adet
+                
+                # 🛠️ KESİN DOĞRU FORMÜL: Kâr/Zarar = (Temizlenmiş Net Kazanç) - (Toplam Alış Maliyeti)
+                kesin_kar_zarar = temiz_net_kazanc - toplam_alis_maliyeti
+                
+                amz_gosterge_listesi.append({
+                    'ASIN/Barkod': asin_kod,
+                    'Brüt Satış Adedi': int(brut_adet),
+                    'İade Adedi': int(iade_adet),
+                    'Net Satış Adedi': int(net_adet),
+                    'Ciro (Brüt)': temiz_ciro,
+                    'Amazon Net Kazanç': temiz_net_kazanc,
+                    'Alış Maliyeti': toplam_alis_maliyeti,
+                    'Toplam Kâr/Zarar': kesin_kar_zarar
+                })
+                
+            st.session_state['df_siparisler_amz'] = pd.DataFrame(amz_gosterge_listesi).sort_values(by='Toplam Kâr/Zarar', ascending=False).reset_index(drop=True)
             st.session_state['hesaplandi_amz'] = True
         except Exception as e:
             st.error(f"Amazon Motoru Hatası: {str(e)}")
