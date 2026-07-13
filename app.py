@@ -4,10 +4,10 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.8", layout="wide")
+st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v6.0", layout="wide")
 
-st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.8 (Nihai Stabil Sürüm)")
-st.markdown("Fiyat tavsiyeleri, reklam motoru ve tekli barkod yazdırma istasyonu entegre edilmiştir.")
+st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v6.0 (Gelişmiş Finans)")
+st.markdown("Fiyat tavsiyeleri, reklam motoru, tekli barkod istasyonu ve detaylı finansal metrikler entegre edilmiştir.")
 st.write("---")
 
 # 1. DOSYA YÜKLEME ALANLARI
@@ -63,6 +63,7 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
                 sonuc_listesi = []
                 eksik_maliyetler = set()
                 toplam_iade_kargo_zarari = 0
+                toplam_iptal_iade_adedi = 0
                 
                 for idx, row in df_prod.iterrows():
                     barkod = str(row['Barkod']).strip()
@@ -76,6 +77,10 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
                     
                     if barkod == 'nan' or siparis_no == 'nan':
                         continue
+                    
+                    # İptal ve İade adetlerini burada sayıyoruz
+                    if "iptal" in statü or "iade" in statü or "reddedildi" in statü:
+                        toplam_iptal_iade_adedi += adet
                     
                     if "iptal" in statü or "reddedildi" in statü:
                         continue
@@ -137,23 +142,30 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
                 toplam_maliyet_gideri = df_final['Ürün Maliyeti'].sum()
                 genel_net_kar = df_final['Net Kâr'].sum() - reklam_gideri
                 
-                total_rows = len(df_final)
-                iade_rows = len(df_final[df_final['Durum'] == 'İade'])
-                iade_orani = (iade_rows / total_rows) * 100 if total_rows > 0 else 0
+                # Trendyol Kesintileri (Komisyon + Kargo + Hizmet toplamı)
+                trendyol_kesintileri = toplam_komisyon + toplam_kargo + toplam_hizmet
+                # Trendyol'dan Gelen Para (Ciro - Kesintiler) -> Kesintiler eksi değerli geldiği için topluyoruz
+                trendyoldan_gelen_para = toplam_ciro + trendyol_kesintileri
+                
+                # Kâr Marjı (%) -> (Net Kâr / Net Ciro) * 100
+                kar_marji = (genel_net_kar / toplam_ciro) * 100 if toplam_ciro > 0 else 0
                 
                 # Verileri Hafızaya Al (Session State)
                 st.session_state['df_sonuc'] = df_final
                 st.session_state['toplam_ciro'] = toplam_ciro
+                st.session_state['trendyoldan_gelen_para'] = trendyoldan_gelen_para
+                st.session_state['trendyol_kesintileri'] = abs(trendyol_kesintileri)
                 st.session_state['genel_net_kar'] = genel_net_kar
-                st.session_state['iade_orani'] = iade_orani
-                st.session_state['toplam_iade_kargo_zarari'] = toplam_iade_kargo_zarari
+                st.session_state['kar_marji'] = kar_marji
+                st.session_state['toplam_iptal_iade_adedi'] = toplam_iptal_iade_adedi
+                
                 st.session_state['reklam_gideri'] = reklam_gideri
                 st.session_state['eksik_maliyetler'] = eksik_maliyetler
                 st.session_state['toplam_maliyet_gideri'] = toplam_maliyet_gideri
                 st.session_state['toplam_komisyon'] = toplam_komisyon
                 st.session_state['toplam_kargo'] = toplam_kargo
                 st.session_state['toplam_hizmet'] = toplam_hizmet
-                st.success("✅ Analiz başarıyla tamamlandı! Aşağıdaki paneller aktifleşti.")
+                st.success("✅ Analiz başarıyla tamamlandı! Finansal göstergeler yenilendi.")
                 
             except Exception as e:
                 st.error(f"📊 Veri İşleme Hatası: {str(e)}")
@@ -162,12 +174,18 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
 if 'df_sonuc' in st.session_state:
     df_sonuc = st.session_state['df_sonuc']
     
-    # Özet Kartları
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("💰 Net Ciro (İadeler Hariç)", f"₺{st.session_state['toplam_ciro']:,.2f}")
-    m2.metric("🟢 Gerçek Net Kâr", f"₺{st.session_state['genel_net_kar']:,.2f}")
-    m3.metric("📦 Genel İade Oranı", f"%{st.session_state['iade_orani']:.2f}")
-    m4.metric("🚨 İade Kargo Zararı", f"₺{st.session_state['toplam_iade_kargo_zarari']:,.2f}")
+    # Yeni İstediğiniz Gelişmiş Finans Kartları (2 Satır Halinde Muazzam Düzen)
+    st.write("### 💵 Detaylı Finansal Durum Paneli")
+    row1_col1, row1_col2, row1_col3 = st.columns(3)
+    row1_col1.metric("💰 Net Ciro (İadeler Hariç)", f"₺{st.session_state['toplam_ciro']:,.2f}")
+    row1_col2.metric("🏦 Trendyol'dan Gelen Para (Hakediş)", f"₺{st.session_state['trendyoldan_gelen_para']:,.2f}", help="Trendyol kesintileri çıktıktan sonra banka hesabınıza giren para.")
+    row1_col3.metric("✂️ Toplam Trendyol Kesintisi", f"₺{st.session_state['trendyol_kesintileri']:,.2f}", help="Komisyon, Kargo ve Hizmet bedellerinin toplamı.")
+    
+    st.write(" ")
+    row2_col1, row2_col2, row2_col3 = st.columns(3)
+    row2_col1.metric("🟢 Gerçek Net Kâr (Reklam Dahil)", f"₺{st.session_state['genel_net_kar']:,.2f}")
+    row2_col2.metric("📈 Net Kâr Marjı (%)", f"%{st.session_state['kar_marji']:.2f}", help="Elde ettiğiniz cironun yüzde kaçının net kâr olarak cebinizde kaldığını gösterir.")
+    row2_col3.metric("🚨 Toplam İptal / İade Adedi", f"{int(st.session_state['toplam_iptal_iade_adedi'])} Adet", help="Rapor dönemindeki toplam iptal edilen ve iade gelen ürün adedi.")
     
     # 🔎 TEKLİ BARKOD YAZDIRMA İSTASYONU
     st.write("---")
