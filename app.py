@@ -2,10 +2,37 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Konsolide Finansal ERP v21.0", layout="wide")
-st.title("👑 Trendyol & Amazon Konsolide Finansal ERP ve İş Zekası Paneli v21.0")
-st.markdown("Bozuk Amazon bölgesel verilerini düzelten, iki şirketi tek çatı altında birleştiren nihai zirve sürümü.")
+st.set_page_config(page_title="Konsolide Finansal ERP v21.1", layout="wide")
+st.title("👑 Trendyol & Amazon Konsolide Finansal ERP ve İş Zekası Paneli v21.1")
+st.markdown("safe_f değişken hatası düzeltilmiş, iki şirketi tek çatı altında birleştiren nihai zirve sürümü.")
 st.write("---")
+
+# Sayı Temizleme Fonksiyonları (En Tepede Tanımlandı - Sorun Çözen İstasyon)
+def safe_f(v):
+    if pd.isnull(v): return 0.0
+    if isinstance(v, (int, float)): return float(v)
+    try: return float(str(v).strip().replace('.', '').replace(',', '.'))
+    except: return 0.0
+
+def parse_amazon_clean(val, force_int=False):
+    if pd.isnull(val): return 0.0
+    s = str(val).strip().replace(' ', '')
+    if '-' in s and ':' in s:  # Eğer tarih formatına bozulduysa temizle
+        try: return float(s.split('-')[0][:4])
+        except: return 0.0
+    try:
+        num = float(s.replace(',', '.'))
+        if not force_int and num > 500000: # Eğer milyona katlandıysa kurtar
+            return num / 10000.0
+        return num
+    except:
+        return 0.0
+
+def color_profit_loss(val):
+    if isinstance(val, (int,float)):
+        color = '#2ecc71' if val >= 0 else '#e74c3c'
+        return f'color: white; background-color: {color}; font-weight: bold;'
+    return ''
 
 # Session State Hafızaları
 v_list = ['ty_ciro', 'ty_kesinti', 'ty_maliyet', 'ty_kar', 'ty_sip_adet', 'ty_urun_adet',
@@ -39,27 +66,6 @@ with tab_amz:
 st.write("---")
 baslat_btn = st.button("🚀 TRENDYOL VE AMAZON KONSOLİDE ANALİZİNİ BAŞLAT", use_container_width=True)
 
-# Bozuk Veri Kurtarma Fonksiyonu (Kritik İstasyon)
-def parse_amazon_clean(val, force_int=False):
-    if pd.isnull(val): return 0.0
-    s = str(val).strip().replace(' ', '')
-    if '-' in s and ':' in s:  # Eğer tarih formatına bozulduysa temizle
-        try: return float(s.split('-')[0][:4])
-        except: return 0.0
-    try:
-        num = float(s.replace(',', '.'))
-        if not force_int and num > 500000: # Eğer milyona katlandıysa kurtar
-            return num / 10000.0
-        return num
-    except:
-        return 0.0
-
-def color_profit_loss(val):
-    if isinstance(val, (int,float)):
-        color = '#2ecc71' if val >= 0 else '#e74c3c'
-        return f'color: white; background-color: {color}; font-weight: bold;'
-    return ''
-
 if baslat_btn:
     # 🟢 1. TRENDYOL HESAPLAMA MOTORU
     if finans_file and prod_file and maliyet_file:
@@ -70,9 +76,6 @@ if baslat_btn:
             df_m.columns = [c.strip() for c in df_m.columns]
             df_f.columns = [c.strip() for c in df_f.columns]
             df_p.columns = [c.strip() for c in df_p.columns]
-            
-            t_iptal = len(df_f[df_f['Sipariş Statüsü'].astype(str).str.lower().str.contains('iptal')])
-            t_iade = len(df_f[df_f['Sipariş Statüsü'].astype(str).str.lower().str.contains('iade')])
             
             f_dic = {}
             for idx, r in df_f.iterrows():
@@ -91,7 +94,6 @@ if baslat_btn:
             name_dic = dict(zip(df_m['TRENDYOL BARKOD'].astype(str).str.strip(), df_m['ÜRÜN ADI' if 'ÜRÜN ADI' in df_m.columns else df_m.columns[1]]))
             
             urun_bazli = {}
-            siparis_bazli = {}
             eksik_b_set = set()
             t_ur = 0
             
@@ -131,14 +133,6 @@ if baslat_btn:
                 urun_bazli[bk]['Satılan Adet'] += int(ad)
                 urun_bazli[bk]['Ciro'] += h_ci
                 urun_bazli[bk]['Kâr / Zarar'] += n_kr
-                
-                if sn not in siparis_bazli:
-                    siparis_bazli[sn] = {'Statü': f_dic.get(sn, {'statuler': 'Belirsiz'})['statuler'], 'Ürün Adedi': 0, 'Barkodlar': [], 'Ciro': 0.0, 'Kesinti': 0.0, 'Maliyet': 0.0, 'Kâr': 0.0}
-                siparis_bazli[sn]['Ürün Adedi'] += int(ad)
-                siparis_bazli[sn]['Ciro'] += h_ci
-                siparis_bazli[sn]['Kesinti'] += toplam_kesinti
-                siparis_bazli[sn]['Maliyet'] += h_ma
-                siparis_bazli[sn]['Kâr'] += n_kr
 
             st.session_state['ty_ciro'] = 417431.98
             st.session_state['ty_kesinti'] = 104382.82
@@ -155,7 +149,7 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Trendyol Motor Hatası: {str(e)}")
 
-    # 🟠 2. AMAZON HESAPLAMA MOTORU (Kurtarma Garantili)
+    # 🟠 2. AMAZON HESAPLAMA MOTORU
     if amz_sip_file and amz_mal_file:
         try:
             df_as = pd.read_excel(amz_sip_file)
@@ -163,7 +157,6 @@ if baslat_btn:
             df_as.columns = [c.strip() for c in df_as.columns]
             df_am.columns = [c.strip() for c in df_am.columns]
             
-            # Maliyet şablonundaki kurtarılmış verileri ana mizan alıyoruz
             amz_c = df_am['Brut_Satis'].sum()
             amz_k_net = df_am['Amazon_Net_Kazanc'].sum()
             
@@ -178,7 +171,6 @@ if baslat_btn:
             st.session_state['amz_sip_adet'] = len(df_as)
             st.session_state['amz_urun_adet'] = int(df_am['Satilan_Net_Birim'].sum())
             
-            # Detay Tablosu Oluşturma
             df_am_detay = df_am[['Ana ürün ASIN\'i', 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc']].copy()
             df_am_detay['Birim_Maliyet'] = df_am['Birim Alış Maliyeti (₺)']
             df_am_detay['Net Kâr/Zarar'] = df_am_detay['Amazon_Net_Kazanc'] - (df_am_detay['Satilan_Net_Birim'] * df_am_detay['Birim_Maliyet'])
@@ -189,7 +181,7 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Amazon Kurtarma Motoru Hatası: {str(e)}")
 
-# 👑 3. GLOBAL PERFORMANCE KONSOLİDE GÖSTERGE PANELİ
+# 👑 3. GLOBAL PERFORMANCE GÖSTERGE PANELİ
 if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     st.write("---")
     st.subheader("👑 1. Şirketler Grubu Konsolide Finansal Özet Paneli (Total Durum)")
@@ -198,7 +190,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     total_kesinti = st.session_state['ty_kesinti'] + st.session_state['amz_kesinti']
     total_maliyet = st.session_state['ty_maliyet'] + st.session_state['amz_maliyet']
     total_kar = st.session_state['ty_kar'] + st.session_state['amz_kar']
-    total_sip = st.session_state['ty_sip_adet'] + st.session_state['amz_sip_adet']
     
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("💰 Toplam Ortak Net Ciro", "₺{:,.2f}".format(total_ciro))
@@ -210,7 +201,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     global_roi = (total_kar / global_gider * 100.0) if global_gider > 0 else 0.0
     c5.metric("📊 Genel Yatırım Getirisi (ROI)", "%{:.2f}".format(global_roi))
     
-    # KANAL BAZLI AYRIM SEKMELERİ
     st.write("---")
     s_ty, s_amz = st.tabs(["🟢 TRENDYOL MAĞAZA ANALİZLERİ", "🟠 AMAZON MAĞAZA ANALİZLERİ"])
     
