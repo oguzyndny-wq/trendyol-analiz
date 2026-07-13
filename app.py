@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Trendyol Finansal ERP v18.0", layout="wide")
-st.title("🤖 Trendyol Profesyonel Finansal ERP & İş Zekası (BI) Paneli v18.0")
+st.set_page_config(page_title="Trendyol Finansal ERP v18.1", layout="wide")
+st.title("🤖 Trendyol Profesyonel Finansal ERP & İş Zekası (BI) Paneli v18.1")
 st.markdown("Kargo Desi Denetimi, Ceza Takibi, Ölü Ürün Alarmları ve Sipariş/Ürün Kârlılık Matrisi.")
 st.write("---")
 
@@ -10,13 +10,13 @@ if 'hesaplandi' not in st.session_state: st.session_state['hesaplandi'] = False
 if 'df_detay' not in st.session_state: st.session_state['df_detay'] = None
 if 'df_siparisler' not in st.session_state: st.session_state['df_siparisler'] = None
 if 'eksik_barkodlar' not in st.session_state: st.session_state['eksik_barkodlar'] = []
-if 'olu_urunler' not in st.session_state: st.session_state['olu_urunler'] = []
+if 'df_olu_urunler' not in st.session_state: st.session_state['df_olu_urunler'] = None
 
 st.subheader("📥 Trendyol Raporlarını Yükleyin")
 col1, col2, col3 = st.columns(3)
-with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f18")
-with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p18")
-with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m18")
+with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f181")
+with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p181")
+with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m181")
 
 ty_rek = st.number_input("🔗 Varsa Trendyol Ekstra Reklam Gideri (TL):", min_value=0.0, value=0.0)
 st.write("---")
@@ -44,12 +44,10 @@ if baslat_btn:
             df_f.columns = [c.strip() for c in df_f.columns]
             df_p.columns = [c.strip() for c in df_p.columns]
             
-            # Finansal dosyadaki net durumları sayma
             f_iptal_serisi = df_f['Sipariş Statüsü'].astype(str).str.lower().str.strip()
             t_iptal = len(df_f[f_iptal_serisi.str.contains('iptal')])
             t_iade = len(df_f[f_iptal_serisi.str.contains('iade')])
             
-            # Finans Veri Sözlüğü
             f_dic = {}
             for idx, r in df_f.iterrows():
                 sn = str(r['Sipariş No']).strip()
@@ -112,16 +110,10 @@ if baslat_btn:
                 if bk == 'TYBI5RUDV2KQX9AR46':
                     n_kr = 1059.19
                 
-                # Desi Aşım Kontrolü (Madde 2)
                 k_desi = safe_f(r.get('Kargodan alınan desi', 0.0))
                 h_desi = safe_f(r.get('Hesapladığım desi', 0.0))
-                desi_uyari = ""
-                if k_desi > h_desi and h_desi > 0:
-                    desi_uyari = f"🚨 Aşım! (+{k_desi - h_desi:.1f} Desi)"
-                else:
-                    desi_uyari = "Normal"
+                desi_uyari = "🚨 Aşım!" if (k_desi > h_desi and h_desi > 0) else "Normal"
                 
-                # Ürün Bazlı Veri
                 if bk not in urun_bazli:
                     urun_bazli[bk] = {'Ürün Adı': prod_name, 'Satılan Adet': 0, 'Ciro': 0.0, 'Kâr / Zarar': 0.0, 'İade Sayısı': 0}
                 urun_bazli[bk]['Satılan Adet'] += int(ad)
@@ -130,7 +122,6 @@ if baslat_btn:
                 if "iade" in f_durum:
                     urun_bazli[bk]['İade Sayısı'] += int(ad)
                 
-                # Sipariş Bazlı Veri
                 if sn not in siparis_bazli:
                     siparis_bazli[sn] = {
                         'Statü': f_dic.get(sn, {'statuler': r.get('Sipariş Statüsü', 'Belirsiz')})['statuler'],
@@ -154,14 +145,24 @@ if baslat_btn:
 
             st.session_state['eksik_barkodlar'] = list(eksik_b_set)
             
-            # Ölü Ürünleri Tespit Etme (Madde 3)
-            olu_list = []
+            # Saçma Siyah Kutuyu Kaldıran Mini Veri Tablosu Hazırlığı
+            olu_data = []
             for k, v in urun_bazli.items():
-                if v['Kâr / Zarar'] < 0 or (v['Satılan Adet'] > 0 and (v['İade Sayısı']/v['Satılan Adet']) > 0.20):
-                    olu_list.append(f"{v['Ürün Adı']} ({k}) -> Kâr: ₺{v['Kâr / Zarar']:.2f}")
-            st.session_state['olu_urunler'] = olu_list
+                iade_orani = (v['İade Sayısı'] / v['Satılan Adet'] * 100) if v['Satılan Adet'] > 0 else 0.0
+                if v['Kâr / Zarar'] < 0 or iade_orani > 20.0:
+                    olu_data.append({
+                        'Barkod': k,
+                        'Ürün Adı': v['Ürün Adı'],
+                        'Satılan Adet': v['Satılan Adet'],
+                        'İade Adedi': v['İade Sayısı'],
+                        'İade Oranı': f"%{iade_orani:.1f}",
+                        'Net Kâr / Zarar': v['Kâr / Zarar']
+                    })
+            if olu_data:
+                st.session_state['df_olu_urunler'] = pd.DataFrame(olu_data).sort_values(by='Net Kâr / Zarar').reset_index(drop=True)
+            else:
+                st.session_state['df_olu_urunler'] = None
 
-            # Mizan Master Verileri Fixlendi
             st.session_state['ty_ciro'] = 417431.98
             st.session_state['ty_kesinti'] = 104382.82
             st.session_state['ty_kar'] = 83628.67 - ty_rek
@@ -173,9 +174,7 @@ if baslat_btn:
 
             df_detay = pd.DataFrame.from_dict(urun_bazli, orient='index').reset_index()
             df_detay.columns = ['Barkod', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Kâr / Zarar', 'İade Sayısı']
-            
-            # Madde 4: Stok Devir Göstergesi (Satış Hızına Göre Gruplama Örneği)
-            df_detay['Satış Hızı Durumu'] = df_detay['Satılan Adet'].apply(lambda x: '🔥 Çok Hızlı Tüketim' if x > 50 else ('📋 Dengeli Stok' if x > 10 else '⚠️ Ağır Devir / Yavaş'))
+            df_detay['Satış Hızı Durumu'] = df_detay['Satılan Adet'].apply(lambda x: '🔥 Hızlı' if x > 50 else ('📋 Dengeli' if x > 10 else '⚠️ Yavaş'))
             st.session_state['df_detay'] = df_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
             
             df_siparisler = pd.DataFrame.from_dict(siparis_bazli, orient='index').reset_index()
@@ -190,21 +189,26 @@ if baslat_btn:
     else:
         st.warning("Lütfen sistem için 3 ana dosyayı da yükleyin.")
 
-# ALARMLAR VE UYARI MERKEZİ
+# 🚨 YENİ VE TERTEMİZ DÜZENLENMİŞ UYARI MERKEZİ
 if st.session_state['hesaplandi']:
-    col_u1, col_u2 = st.columns(2)
-    with col_u1:
-        if st.session_state['eksik_barkodlar']:
-            st.error(f"⚠️ MALİYETİ OLMAYAN BARKODLAR ({len(st.session_state['eksik_barkodlar'])} Adet):")
-            st.code(", ".join(st.session_state['eksik_barkodlar']))
-    with col_u2:
-        if st.session_state['olu_urunler']:
-            st.warning(f"🚨 KRİTİK MÜDAHALE GEREKEN ÖLÜ ÜRÜNLER ALARMI ({len(st.session_state['olu_urunler'])} Ürün):")
-            st.code("\n".join(st.session_state['olu_urunler'][:5]) + ("\n...ve dahası" if len(st.session_state['olu_urunler']) > 5 else ""))
+    if st.session_state['eksik_barkodlar']:
+        st.error(f"⚠️ MALİYETİ OLMAYAN BARKODLAR ({len(st.session_state['eksik_barkodlar'])} Adet):")
+        st.code(", ".join(st.session_state['eksik_barkodlar']))
+        
+    if st.session_state['df_olu_urunler'] is not None:
+        st.markdown("### 🚨 Kritik Müdahale Gereken Ölü ve Zarar Eden Ürünler Alarmı")
+        st.markdown("Aşağıdaki listedeki ürünler ya zarardadır ya da iade oranları kâr payını tamamen eritmiştir. Acil fiyat revizyonu önerilir.")
+        
+        df_olu_goster = st.session_state['df_olu_urunler'].copy()
+        styled_olu = df_olu_goster.style.format({
+            'Net Kâr / Zarar': '₺{:,.2f}'
+        }).map(color_profit_loss, subset=['Net Kâr / Zarar'])
+        
+        st.dataframe(styled_olu, use_container_width=True, height=250)
+        st.write("---")
 
 # RAPORLAMA KARTLARI
 if st.session_state['hesaplandi']:
-    st.write("---")
     st.subheader("📊 1. Üst Düzey Finansal KPI Kontrol İstasyonu")
     
     m1, m2, m3, m4, m5, m6 = st.columns(6)
@@ -233,7 +237,6 @@ if st.session_state['hesaplandi']:
     m10.metric("🚫 İptal Sipariş", f"{st.session_state['ty_iptal_adet']} Adet")
     m11.metric("🔄 İade Sipariş", f"{st.session_state['ty_iade_adet']} Adet")
     
-    # SEKMELİ DETAY TABLOLARI
     st.write("---")
     sekme1, sekme2 = st.tabs(["🔍 Ürün Bazlı Analiz ve Stok Hızı Raporu", "📦 Sipariş Bazlı Kârlılık, Ceza ve Desi Denetim Raporu"])
     
