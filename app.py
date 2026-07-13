@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Konsolide Finansal ERP v25.0", layout="wide")
-st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v25.0")
-st.markdown("Amazon sipariş detaylarındaki ters çıkarma ve bölme hataları tamamen düzeltilmiş kusursuz sürüm.")
+st.set_page_config(page_title="Konsolide Finansal ERP v25.1", layout="wide")
+st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v25.1")
+st.markdown("Amazon sipariş detaylarındaki negatif sayı bölme hatası mutlak değer (abs) süzgeciyle tamamen düzeltilmiş kesin sürüm.")
 st.write("---")
 
 # Sayı Temizleme Fonksiyonları
@@ -22,7 +22,8 @@ def parse_amazon_clean(val, force_int=False):
         except: return 0.0
     try:
         num = float(s.replace(',', '.'))
-        if not force_int and num > 500000:
+        # 🎯 KESİN ÇÖZÜM: Mutlak değer kontrolü sayesinde eksi rakamlar da başarıyla bölünür
+        if not force_int and abs(num) > 100000:
             return num / 10000.0
         return num
     except:
@@ -230,19 +231,15 @@ if baslat_btn:
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Kâr / Zarar']
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
             
-            # 🚨 DÜZELTME: Amazon Sipariş Detay Doğru Temizleme ve Doğru Çıkarma İstasyonu
+            # Amazon Sipariş Detay Doğru Temizleme İstasyonu
             amz_m_dict = dict(zip(df_am['Ana ürün ASIN\'i'].astype(str).str.strip(), df_am['Birim Alış Maliyeti (₺)']))
-            
             df_as_goster = df_as[['Ana ürün ASIN\'i', 'Satılan birimler', 'İade edilen birimler', 'Satılan net birim sayısı', 'Satış', 'Toplam Net kazanç']].copy()
             
-            # Önce tüm finansal hücreler süzgeçten geçirilip gerçek kuruşlu hallerine indiriliyor
+            # 🎯 TÜM METRİKLER abs() DESTEKLİ TEMİZLENİYOR
             df_as_goster['Toplam Net kazanç'] = df_as_goster['Toplam Net kazanç'].apply(parse_amazon_clean)
             df_as_goster['Satış'] = df_as_goster['Satış'].apply(parse_amazon_clean)
             
-            # Gerçek Alış Maliyeti
             df_as_goster['Alış Maliyeti'] = df_as_goster.apply(lambda row: safe_f(amz_m_dict.get(str(row['Ana ürün ASIN\'i']).strip(), 0.0)) * safe_f(row['Satılan net birim sayısı']), axis=1)
-            
-            # 🎯 DOĞRU MATEMATİK FORMÜLÜ: (Net Kazanç - Ürün Maliyeti) 
             df_as_goster['Toplam Kâr/Zarar'] = df_as_goster['Toplam Net kazanç'] - df_as_goster['Alış Maliyeti']
             
             df_as_goster.columns = ['ASIN/Barkod', 'Brüt Satış Adedi', 'İade Adedi', 'Net Satış Adedi', 'Ciro (Brüt)', 'Amazon Net Kazanç', 'Alış Maliyeti', 'Toplam Kâr/Zarar']
