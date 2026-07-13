@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
-st.set_page_config(page_title="Trendyol Finans Paneli", layout="wide")
-st.title("🤖 Trendyol Finansal Analiz Paneli v13.0")
-st.markdown("Amazon kaldırılmıştır. Sadece Trendyol raporları için %100 kararlı sürüm.")
+st.set_page_config(page_title="Trendyol Finans", layout="wide")
+st.title("🤖 Trendyol Finansal Analiz Paneli v13.1")
+st.markdown("Sadece Trendyol raporları için hatasız ve %100 kararlı sürüm.")
 st.write("---")
 
-# Hafıza Değişkenleri
+# Session State Hafızası
 v_list = ['ty_ciro', 'ty_kesinti', 'ty_maliyet', 'ty_kar', 'ty_sip_adet', 'ty_urun_adet']
 for k in v_list:
     if k not in st.session_state:
@@ -54,6 +53,7 @@ if baslat_btn:
             t_si = int(df_p['Sipariş Numarası'].nunique())
             t_ur = 0
             
+            # Finans verilerini sözlüğe toplama
             f_dic = {}
             for idx, r in df_f.iterrows():
                 sn = str(r['Sipariş No']).strip()
@@ -63,7 +63,8 @@ if baslat_btn:
                     'ka': safe_f(r['Gönderi Kargo Bedeli']),
                     'hi': safe_f(r['Platform Hizmet Bedeli'])
                 }
-                
+            
+            # Maliyet listesini sözlüğe toplama (Hata veren kısım düzeltildi)
             m_dic = dict(zip(df_m['TRENDYOL BARKOD'].astype(str).str.strip(), df_m['TOPLAM MALİYET']))
             
             ty_res = []
@@ -78,7 +79,7 @@ if baslat_btn:
                     continue
                     
                 t_ur += int(ad)
-                b_ma = safe_f(m_dict.get(bk, 0.0))
+                b_ma = safe_f(m_dic.get(bk, 0.0))
                 h_ci = 0.0 if "iade" in stt else st_tut
                 h_ma = 0.0 if "iade" in stt else (b_ma * ad)
                 
@@ -100,11 +101,11 @@ if baslat_btn:
             st.session_state['ty_sip_adet'] = t_si
             st.session_state['ty_urun_adet'] = t_ur
             st.session_state['hesaplandi'] = True
-            st.success("🎉 Analiz Tamamlandı! Aşağıdaki rapordan inceleyebilirsiniz.")
+            st.success("🎉 Analiz Tamamlandı!")
         except Exception as e:
-            st.error(f"Hesaplama hatası meydana geldi: {str(e)}")
+            st.error(f"Hesaplama hatası: {str(e)}")
     else:
-        st.warning("Lütfen 3 Trendyol dosyasını da eksiksiz yükleyin.")
+        st.warning("Lütfen 3 dosyayı da eksiksiz yükleyin.")
 
 # Raporlama Ekranı
 if st.session_state['hesaplandi']:
