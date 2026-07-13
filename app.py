@@ -2,9 +2,94 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Konsolide Finansal ERP v31.0", layout="wide")
-st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v31.0")
-st.markdown("Global Başabaş Noktası (Break-Even) Analiz Kutusu ve pasta grafikleri eklenmiş, mevcut mizan düzeni %100 korunmuş nihai kararlı sürüm.")
+st.set_page_config(page_title="Konsolide ERP Premium", layout="wide")
+
+# 📊 CEO EXECUTIVE DESIGN - GELİŞMİŞ CSS ARAYÜZ CİLASI
+st.markdown("""
+    <style>
+    /* Ana Arka Plan ve Yazı Tipi */
+    .stApp {
+        background-color: #0b132b;
+        color: #f4f6f9;
+    }
+    /* Devasa Başlık Tasarımı */
+    .main-title {
+        font-size: 32px !important;
+        font-weight: 800 !important;
+        color: #d4af37 !important;
+        text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+    }
+    /* Premium Kutu/Konteyner Tasarımı */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, #1c2541 0%, #111a36 100%) !important;
+        border: 1px solid #3a506b !important;
+        border-radius: 12px !important;
+        padding: 15px 20px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+        transition: transform 0.2s ease-in-out !important;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-3px) !important;
+        border-color: #d4af37 !important;
+    }
+    /* Metrik Yazıları */
+    div[data-testid="stMetricLabel"] {
+        color: #a5a1ff !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+    }
+    /* Başabaş Noktası Kutusu Citası */
+    div[data-testid="stForm"], .element-container div.stAlert {
+        border-radius: 12px !important;
+    }
+    /* Tab Tasarımları (Trendyol / Amazon Sekmeleri) */
+    .stTabs [data-baseweb="tab"] {
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        color: #8ecae6 !important;
+        padding: 10px 25px !important;
+        transition: all 0.3s;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #d4af37 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #d4af37 !important;
+        border-bottom-color: #d4af37 !important;
+        font-size: 16px !important;
+    }
+    /* Dev Başlat Butonu Stili */
+    .stButton>button {
+        background: linear-gradient(90deg, #d4af37 0%, #aa7c11 100%) !important;
+        color: #0b132b !important;
+        font-weight: 800 !important;
+        font-size: 16px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 12px 0px !important;
+        box-shadow: 0 4px 15px rgba(212,175,55,0.3) !important;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(90deg, #f3e5ab 0%, #d4af37 100%) !important;
+        box-shadow: 0 6px 20px rgba(212,175,55,0.5) !important;
+        transform: scale(1.01);
+    }
+    </style>
+""", unsafe_html=True)
+
+st.markdown('<p class="main-title">💼 TRENDYOL & AMAZON KONSOLİDE ERP & EXECUTIVE BI PANEL</p>', unsafe_html=True)
+st.markdown("<p style='color: #8ecae6; margin-top:-10px;'>Şirketler Grubu Finansal Yönetim, Nakit Akışı, Lojistik Kırılım ve Performans Denetim Merkezi</p>", unsafe_html=True)
 st.write("---")
 
 # Sayı Temizleme Fonksiyonu
@@ -49,7 +134,7 @@ for k in v_list:
         else: st.session_state[k] = 0.0
 
 # 📥 RAPOR YÜKLEME PANELI
-st.subheader("📥 Dükkan Raporlarını Yükleme İstasyonu")
+st.subheader("📥 Veri Ambarı Giriş İstasyonu")
 tab_ty, tab_amz = st.tabs(["🟢 TRENDYOL RAPORLARI", "🟠 AMAZON RAPORLARI"])
 
 with tab_ty:
@@ -66,7 +151,7 @@ with tab_amz:
     amz_rek = st.number_input("🔗 Amazon Panel Dışı Harici Reklam Gideri (TL):", min_value=0.0, value=0.0, step=100.0)
 
 st.write("---")
-baslat_btn = st.button("🚀 TÜM MAĞAZALARI VE KONSOLİDE HESAPLAMAYI BAŞLAT", use_container_width=True)
+baslat_btn = st.button("🚀 TÜM MAĞAZALARI VE KONSOLİDE PREMİUM ANALİZİ BAŞLAT", use_container_width=True)
 
 if baslat_btn:
     # 🟢 1. TRENDYOL HESAPLAMA MOTORU
@@ -177,7 +262,6 @@ if baslat_btn:
                 df_na = pd.DataFrame(nakit_akis_list)
                 st.session_state['df_nakit_akis_ty'] = df_na.groupby('Hafta')['Tutar'].sum().reset_index().sort_values(by='Hafta')
             
-            # Trendyol Ölü Ürün Süzgeci
             olu_data_ty = []
             for k, v in urun_bazli.items():
                 iade_orani = (v['İade Sayısı'] / v['Satılan Adet'] * 100) if v['Satılan Adet'] > 0 else 0.0
@@ -224,7 +308,6 @@ if baslat_btn:
             st.session_state['amz_iade_adet'] = int(df_as['İade edilen birimler'].sum() if 'İade edilen birimler' in df_as.columns else 0)
             st.session_state['amz_iptal_adet'] = 0
             
-            # Ürün Bazlı Tablo
             df_am_detay = df_am[['Ana ürün ASIN\'i', 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc', 'Birim Alış Maliyeti (₺)', 'Mal_Maliyet']].copy()
             df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon_Net_Kazanc'] - df_am_detay['Mal_Maliyet']
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Toplam Ürün Maliyeti', 'Kâr / Zarar']
@@ -238,7 +321,6 @@ if baslat_btn:
             if olu_data_amz: st.session_state['df_olu_urunler_amz'] = pd.DataFrame(olu_data_amz).sort_values(by='Net Kâr / Zarar').reset_index(drop=True)
             else: st.session_state['df_olu_urunler_amz'] = None
             
-            # Sipariş Bazlı Gösterge Listesi
             amz_gosterge_listesi = []
             for idx, r_amz in df_am.iterrows():
                 asin_kod = str(r_amz['Ana ürün ASIN\'i']).strip()
@@ -258,10 +340,10 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Amazon Motoru Hatası: {str(e)}")
 
-# 👑 3. KONSOLİDE GLOBAL PERFORMANCE GÖSTERGELERİ
+# 👑 3. PREMIUM KONSOLİDE ÜST PANEL VE METRİKLER
 if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     st.write("---")
-    st.subheader("👑 1. Şirketler Grubu Ortak Finansal Özet Paneli (Total Konsolide Durum)")
+    st.subheader("👑 Şirketler Grubu Konsolide Finansal Özet Paneli")
     
     total_ciro = st.session_state['ty_ciro'] + st.session_state['amz_ciro']
     total_kesinti = st.session_state['ty_kesinti'] + st.session_state['amz_kesinti']
@@ -271,10 +353,10 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     total_reklam = ty_rek + amz_rek
     
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("💰 Toplam Ortak Net Ciro", "₺{:,.2f}".format(total_ciro))
-    c2.metric("❌ Toplam Ortak Kesinti", "₺{:,.2f}".format(total_kesinti))
-    c3.metric("📦 Toplam Ürün Sermayesi", "₺{:,.2f}".format(total_maliyet))
-    c4.metric("🟢 Konsolide Net Saf Kâr", "₺{:,.2f}".format(total_kar))
+    c1.metric("💰 Ortak Net Ciro", "₺{:,.2f}".format(total_ciro))
+    c2.metric("❌ Ortak Kesinti", "₺{:,.2f}".format(total_kesinti))
+    c3.metric("📦 Ürün Sermayesi", "₺{:,.2f}".format(total_maliyet))
+    c4.metric("🟢 Net Saf Kâr", "₺{:,.2f}".format(total_kar))
     
     st.write(" ")
     cc1, cc2, cc3, cc4 = st.columns(4)
@@ -284,39 +366,34 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     g_sepet = total_ciro / total_sip if total_sip > 0 else 0.0
     g_sip_kar = total_kar / total_sip if total_sip > 0 else 0.0
     
-    cc1.metric("📊 Ortak Yatırım Getirisi (ROI)", "%{:.2f}".format(g_roi))
-    cc2.metric("📈 Ortak Net Kâr Marjı (%)", "%{:.2f}".format(g_marj))
-    cc3.metric("🛒 Ortak Sepet Ortalaması", "₺{:.2f}".format(g_sepet))
-    cc4.metric("💵 Ortak Sipariş Başı Kâr", "₺{:.2f}".format(g_sip_kar))
+    cc1.metric("📊 Yatırım Getirisi (ROI)", "%{:.2f}".format(g_roi))
+    cc2.metric("📈 Net Kâr Marjı (%)", "%{:.2f}".format(g_marj))
+    cc3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(g_sepet))
+    cc4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(g_sip_kar))
     
-    # 📉 🎯 ARANAN BÖLÜM: Global Başabaş Noktası (Break-Even) Analiz Kutusu (Zararsız Entegrasyon)
+    # 📉 Global Başabaş Noktası Kutusu
     st.write(" ")
-    st.markdown("### 📉 2. Global Başabaş Noktası (Break-Even) Hesaplama İstasyonu")
+    st.markdown("### 📉 Global Başabaş Noktası (Break-Even) Hesaplama İstasyonu")
     with st.container(border=True):
         col_be1, col_be2, col_be3 = st.columns([1, 1.5, 1.5])
         with col_be1:
-            sabit_gider = st.number_input("🏠 Aylık Diğer Sabit Giderleriniz (Kira, Personel, Muhasebe vb. Toplamı):", min_value=0.0, value=0.0, step=1000.0, key="be_input")
+            sabit_gider = st.number_input("🏠 Aylık Harici Sabit Giderleriniz (Kira, Personel vb.):", min_value=0.0, value=0.0, step=1000.0, key="be_premium")
         
-        # Matematiksel Analiz
         if g_marj > 0:
             gereken_aylik_ciro = sabit_gider / (g_marj / 100.0)
             gereken_gunluk_ciro = gereken_aylik_ciro / 30.0
-            
             with col_be2:
-                st.metric("🎯 Batmamak İçin Gereken Minimum Aylık Ciro", "₺{:,.2f}".format(gereken_aylik_ciro))
-                st.caption(f"Dükkanın genel net kâr marjı (%{g_marj:.2f}) baz alınarak hesaplanmıştır.")
+                st.metric("🎯 Minimum Aylık Ciro Barajı", "₺{:,.2f}".format(gereken_aylik_ciro))
             with col_be3:
-                st.metric("📅 Günlük Minimum Ciro Barajı", "₺{:,.2f}".format(gereken_gunluk_ciro))
+                st.metric("📅 Günlük Minimum Ciro Hedefi", "₺{:,.2f}".format(gereken_gunluk_ciro))
                 if total_ciro >= gereken_aylik_ciro:
-                    st.success("🟢 Tebrikler! Mevcut konsolide cironuz sabit gider barajını şimdiden aşmış durumda.")
+                    st.success("🟢 Barajın üzerindesiniz, dükkan güvende!")
                 else:
-                    st.warning(f"🚨 Baraj Altındasınız! Sabit giderlerinizi kurtarmak için en az ₺{gereken_aylik_ciro - total_ciro:,.2f} ciroya daha ihtiyacınız var.")
-        else:
-            st.info("Başabaş noktasının hesaplanabilmesi için sistemde artı bakiye kâr marjı oluşmalıdır.")
+                    st.warning(f"🚨 Sabit giderleri kurtarmak için ₺{gereken_aylik_ciro - total_ciro:,.2f} ciro daha lazım.")
 
     # 📊 Görsel Grafikler Sekmesi
     st.write(" ")
-    with st.expander("📊 Mağazaların Ciro Dağılım & Gider Sermaye Yapısı Dağılımı", expanded=True):
+    with st.expander("📊 Mağazaların Ciro Dağılım & Gider Yapısı Dağılımı", expanded=True):
         g_col1, g_col2 = st.columns(2)
         with g_col1:
             st.write("**Mağazaların Ciro Dağılım Payı**")
@@ -324,7 +401,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             st.bar_chart(chart_data_ciro, x='Pazaryeri', y='Ciro', color='#3498db')
         with g_col2:
             st.write("**Holding Genel Gider / Sermaye Yapısı Dağılımı**")
-            chart_data_gider = pd.DataFrame({'Gider Kalemi': ['Hizmet/Kargo/Kesinti', 'Ürün Alış Sermayesi', 'Reklam/Pazarlama'], 'Tutar': [total_kesinti, total_maliyet, total_reklam]})
+            chart_data_gider = pd.DataFrame({'Gider Kalemi': ['Hizmet/Kesinti', 'Ürün Sermayesi', 'Reklam/Pazarlama'], 'Tutar': [total_kesinti, total_maliyet, total_reklam]})
             st.bar_chart(chart_data_gider, x='Gider Kalemi', y='Tutar', color='#e67e22')
 
     st.write("---")
@@ -335,7 +412,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             if st.session_state['eksik_barkodlar_ty']:
                 st.error(f"⚠️ MALİYETİ OLMAYAN TRENDYOL BARKODLARI: {', '.join(st.session_state['eksik_barkodlar_ty'])}")
             
-            # 🚨 ALARM YERİNDE: Trendyol Ölü Ürün Alarmları Tablosu
+            # 🚨 ALARM: Trendyol Ölü Ürün Alarmları Tablosu
             if st.session_state['df_olu_urunler_ty'] is not None:
                 st.markdown("### 🚨 Kritik Müdahale Gereken Ölü Ürünler Alarmı (Trendyol)")
                 st.dataframe(st.session_state['df_olu_urunler_ty'].style.format({'Net Kâr / Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Net Kâr / Zarar']), use_container_width=True, height=150)
@@ -350,11 +427,11 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             
             m1, m2, m3, m4, m5, m6 = st.columns(6)
             m1.metric("Net Ciro", "₺{:,.2f}".format(st.session_state['ty_ciro']))
-            m2.metric("Trendyol Kesintileri", "₺{:,.2f}".format(st.session_state['ty_kesinti']))
+            m2.metric("Kesintiler", "₺{:,.2f}".format(st.session_state['ty_kesinti']))
             m3.metric("Net Kâr", "₺{:,.2f}".format(st.session_state['ty_kar']))
             m4.metric("🚫 İptal / 🔄 İade", f"{st.session_state['ty_iptal_adet']} / {st.session_state['ty_iade_adet']} Adet")
-            m5.metric("📢 Reklam Skoru (ROAS)", "{:.1f}x".format(ty_roas) if ty_rek > 0 else "YOK")
-            m6.metric("📦 Toplam Ürün Adedi", f"{int(st.session_state['ty_urun_adet'])} Adet")
+            m5.metric("ROAS", "{:.1f}x".format(ty_roas) if ty_rek > 0 else "YOK")
+            m6.metric("Ürün Adedi", f"{int(st.session_state['ty_urun_adet'])} Adet")
             
             st.write(" ")
             mm1, mm2, mm3, mm4 = st.columns(4)
@@ -372,12 +449,11 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             with sekme_ty3:
                 if st.session_state['df_nakit_akis_ty'] is not None:
                     st.dataframe(st.session_state['df_nakit_akis_ty'].style.format({'Tutar': '₺{:,.2f}'}), use_container_width=True)
-        else: st.info("Trendyol Raporları Henüz Yüklenmedi.")
+        else: st.info("Trendyol Raporları Yüklenmedi.")
             
     with s_amz:
         if st.session_state['hesaplandi_amz']:
-            
-            # 🚨 ALARM YERİNDE: Amazon Zarar Eden Ürün Alarmları Tablosu
+            # 🚨 ALARM: Amazon Zarar Eden Ürün Alarmları Tablosu
             if st.session_state['df_olu_urunler_amz'] is not None:
                 st.markdown("### 🚨 Kritik Müdahale Gereken Ölü Ürünler Alarmı (Amazon)")
                 st.dataframe(st.session_state['df_olu_urunler_amz'].style.format({'Ciro': '₺{:,.2f}', 'Net Kâr / Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Net Kâr / Zarar']), use_container_width=True, height=150)
@@ -390,9 +466,9 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             amz_sip_k = st.session_state['amz_kar'] / st.session_state['amz_sip_adet'] if st.session_state['amz_sip_adet'] > 0 else 0.0
             
             a1, a2, a3, a4 = st.columns(4)
-            a1.metric("Amazon Net Ciro", "₺{:,.2f}".format(st.session_state['amz_ciro']))
-            a2.metric("Amazon Toplam Kesinti (Mizan)", "₺{:,.2f}".format(st.session_state['amz_kesinti']))
-            a3.metric("Amazon Net Kâr", "₺{:,.2f}".format(st.session_state['amz_kar']))
+            a1.metric("Net Ciro", "₺{:,.2f}".format(st.session_state['amz_ciro']))
+            a2.metric("Toplam Kesinti (Mizan)", "₺{:,.2f}".format(st.session_state['amz_kesinti']))
+            a3.metric("Net Kâr", "₺{:,.2f}".format(st.session_state['amz_kar']))
             a4.metric("🚫 İptal / 🔄 İade", f"{st.session_state['amz_iptal_adet']} / {st.session_state['amz_iade_adet']} Adet")
             
             st.write(" ")
@@ -402,11 +478,11 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             aa3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(amz_sepet))
             aa4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(amz_sip_k))
             
-            st.markdown("#### 🔍 Amazon Doğrulanmış Resmi Gider Analiz Kartları")
+            st.markdown("#### 🔍 Amazon Doğrulanmış Gider Analiz Kartları")
             g1, g2, g3 = st.columns(3)
-            g1.metric("📦 Tahmini Amazon Lojistik Ücreti (FBA + Depolama)", "₺{:,.2f}".format(st.session_state['amz_resmi_lojistik']))
-            g2.metric("🤝 Tahmini Resmi Satış Komisyonu Kesintisi", "₺{:,.2f}".format(st.session_state['amz_resmi_komisyon']))
-            g3.metric("💰 Banka Hesabına Gelecek Net Hakediş (Maliyet Öncesi)", "₺{:,.2f}".format(st.session_state['amz_resmi_hakedis']))
+            g1.metric("📦 Tahmini Lojistik Ücreti (FBA + Depolama)", "₺{:,.2f}".format(st.session_state['amz_resmi_lojistik']))
+            g2.metric("🤝 Tahmini Satış Komisyonu Kesintisi", "₺{:,.2f}".format(st.session_state['amz_resmi_komisyon']))
+            g3.metric("💰 Net Hakediş (Maliyet Öncesi)", "₺{:,.2f}".format(st.session_state['amz_resmi_hakedis']))
             
             st.write("---")
             sekme_amz1, sekme_amz2 = st.tabs(["🔍 Ürün Bazlı Kârlılık Matrisi", "📦 Sipariş Detay Analiz Listesi"])
