@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Trendyol Detaylı Analiz", layout="wide")
-st.title("🤖 Trendyol Ürün Bazlı Finansal Analiz Paneli v14.0")
-st.markdown("Her ürünün kâr/zarar durumunu kuruşu kuruşuna listeleyen ve renklendiren gelişmiş sürüm.")
+st.title("🤖 Trendyol Ürün Bazlı Finansal Analiz Paneli v14.1")
+st.markdown("Hatalı değişken ismi düzeltilmiş, kâr-zarar renklendirmeli kesin sürüm.")
 st.write("---")
 
 # Hafıza Değişkenleri
@@ -65,7 +65,6 @@ if baslat_btn:
             
             # Ürün isimlerini ve maliyetlerini sözlüğe toplama
             m_dic = dict(zip(df_m['TRENDYOL BARKOD'].astype(str).str.strip(), df_m['TOPLAM MALİYET']))
-            # Maliyet şablonunda ürün adı varsa eşleştirmek için:
             isim_col = 'ÜRÜN ADI' if 'ÜRÜN ADI' in df_m.columns else df_m.columns[1]
             name_dic = dict(zip(df_m['TRENDYOL BARKOD'].astype(str).str.strip(), df_m[isim_col]))
             
@@ -82,7 +81,8 @@ if baslat_btn:
                 if bk == 'nan' or sn == 'nan' or "iptal" in stt or "reddedildi" in stt:
                     continue
                     
-                b_ma = safe_f(m_dict.get(bk, 0.0))
+                # Hata veren m_dict ismi m_dic olarak düzeltildi
+                b_ma = safe_f(m_dic.get(bk, 0.0))
                 h_ci = 0.0 if "iade" in stt else st_tut
                 h_ma = 0.0 if "iade" in stt else (b_ma * ad)
                 
@@ -122,7 +122,6 @@ if st.session_state['hesaplandi'] and st.session_state['df_detay'] is not None:
     st.subheader("📊 Ürün Bazlı Detaylı Kârlılık Raporu")
     st.markdown("Aşağıdaki tabloda **Kâr / Zarar** sütunu kâr eden ürünler için **Yeşil**, zarar edenler için **Kırmızı** renkte boyanmıştır.")
     
-    # Tabloyu biçimlendirme ve renklendirme motoru
     df_goster = st.session_state['df_detay'].copy()
     
     styled_df = df_goster.style.format({
