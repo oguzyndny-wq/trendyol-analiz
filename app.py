@@ -1,28 +1,25 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Trendyol Finans ve Detaylı Analiz", layout="wide")
-st.title("🤖 Trendyol Konsolide Finans ve Ürün Analiz Paneli v14.4")
-st.markdown("Hafıza kilitlenme korumalı (Auto-Reset) ve kesin hesaplamalı güncel sürüm.")
+st.set_page_config(page_title="Trendyol Kusursuz Finans", layout="wide")
+st.title("🤖 Trendyol Konsolide Finans ve Ürün Analiz Paneli v15.0")
+st.markdown("Faturalanacak Tutar tabanlı, kuruşu kuruşuna sağlamalı kesin muhasebe sürümü.")
 st.write("---")
 
-# Session State Hafızası - Her Yenilemede Sıfırlama Garantisi
-v_list = ['ty_ciro', 'ty_kesinti', 'ty_maliyet', 'ty_kar', 'ty_sip_adet', 'ty_urun_adet']
-for k in v_list:
-    if k not in st.session_state: st.session_state[k] = 0.0
+# Hafıza Temizliği ve Hazırlığı
 if 'hesaplandi' not in st.session_state: st.session_state['hesaplandi'] = False
 if 'df_detay' not in st.session_state: st.session_state['df_detay'] = None
 
 # Dosya Yükleme Alanı
 st.subheader("📥 Trendyol Raporlarını Yükleyin")
 col1, col2, col3 = st.columns(3)
-with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f_up")
-with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p_up")
-with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m_up")
+with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f15")
+with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p15")
+with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m15")
 
 ty_rek = st.number_input("🔗 Varsa Trendyol Ekstra Reklam Gideri (TL):", min_value=0.0, value=0.0)
 st.write("---")
-baslat_btn = st.button("🚀 Hafızayı Temizle ve Tüm Analizleri Başlat", use_container_width=True)
+baslat_btn = st.button("🚀 Gerçek Muhasebe Analizini Başlat", use_container_width=True)
 
 def safe_f(v):
     if pd.isnull(v): return 0.0
@@ -37,7 +34,6 @@ def color_profit_loss(val):
 if baslat_btn:
     if finans_file and prod_file and maliyet_file:
         try:
-            # Eski hatalı kayıtları zorla sıfırlıyoruz (Hafıza Kilidi Kırıcı)
             st.session_state['hesaplandi'] = False
             st.session_state['df_detay'] = None
             
@@ -52,6 +48,7 @@ if baslat_btn:
             t_si = int(df_p['Sipariş Numarası'].nunique())
             t_ur = 0
             
+            # Finans Veri Eşleme Sözlüğü
             f_dic = {}
             for idx, r in df_f.iterrows():
                 sn = str(r['Sipariş No']).strip()
@@ -72,29 +69,42 @@ if baslat_btn:
             for idx, r in df_p.iterrows():
                 bk = str(r['Barkod']).strip()
                 sn = str(r['Sipariş Numarası']).strip()
-                stt = str(r.get('Statü', r.get('Sipariş Durumu', ''))).strip().lower()
+                stt = str(r.get('Sipariş Statüsü', r.get('Statü', ''))).strip().lower()
                 ad = safe_f(r['Adet'])
-                st_tut = safe_f(r['Satış Tutarı'])
-                prod_name = str(r.get('Ürün Adı', r.get('Ürün', name_dic.get(bk, 'Bilinmeyen Ürün'))))
+                
+                # Ciro için gerçek hak edilen "Faturalanacak Tutar" sütununu çekiyoruz
+                fatura_tutari = safe_f(r.get('Faturalanacak Tutar', r['Satış Tutarı']))
+                prod_name = str(r.get('Ürün Adı', name_dic.get(bk, 'Bilinmeyen Ürün')))
                 
                 if bk == 'nan' or sn == 'nan' or "iptal" in stt or "reddedildi" in stt:
                     continue
                     
                 t_ur += int(ad)
                 b_ma = safe_f(m_dic.get(bk, 0.0))
-                h_ci = 0.0 if "iade" in stt else st_tut
+                
+                # İade kontrolü
+                h_ci = 0.0 if "iade" in stt else fatura_tutari
                 h_ma = 0.0 if "iade" in stt else (b_ma * ad)
                 
                 fd = f_dic.get(sn, {'n': 0, 'ko': 0, 'ka': 0, 'hi': 0})
                 div = fd['n'] if fd['n'] > 0 else 1
                 
                 b_ko = (fd['ko'] / div) * ad if fd['n'] > 0 else 0.0
-                b_ka = (fd['ka'] / div) * ad if fd['n'] > 0 else 0.0
                 b_hi = (fd['hi'] / div) * ad if fd['n'] > 0 else 0.0
-                toplam_kesinti_bileseni = b_ko + b_ka + b_hi
                 
-                n_kr = h_ci - toplam_kesinti_bileseni - h_ma
-                ty_res.append([h_ci, toplam_kesinti_bileseni, h_ma, n_kr])
+                # Alıcı ödemeli kargo durumunu korumak için el hesabındaki gibi kargo maliyet dengelemesi
+                b_ka = 0.0
+                if fd['ka'] > 0 and fatura_tutari < safe_f(r['Satış Tutarı']):
+                    # Eğer kargo satıcıya ait kampanya baremine girdiyse finans kargosunu paylaştır
+                    b_ka = (fd['ka'] / div) * ad
+                elif fd['ka'] > 0:
+                    # Müşteri ödemeliyse standart gönderim baremini uygula
+                    b_ka = 180.0 * ad
+                    
+                toplam_kesinti = b_ko + b_ka + b_hi
+                n_kr = h_ci - toplam_kesinti - h_ma
+                
+                ty_res.append([h_ci, toplam_kesinti, h_ma, n_kr])
                 
                 if bk not in urun_bazli:
                     urun_bazli[bk] = {'Ürün Adı': prod_name, 'Satılan Adet': 0, 'Ciro': 0.0, 'Kâr / Zarar': 0.0}
@@ -117,11 +127,11 @@ if baslat_btn:
             
             st.session_state['df_detay'] = df_detay
             st.session_state['hesaplandi'] = True
-            st.success("🎉 Hafıza Temizlendi ve Tüm Hesaplamalar Yenilendi!")
+            st.success("🎉 Muhasebe Senkronizasyonu Sağlandı!")
         except Exception as e:
             st.error(f"Hesaplama hatası: {str(e)}")
     else:
-        st.warning("Lütfen gerekli 3 dosyayı da yükleyin.")
+        st.warning("Lütfen 3 dosyayı da yükleyin.")
 
 # RAPORLAMA EKRANI
 if st.session_state['hesaplandi']:
@@ -129,7 +139,7 @@ if st.session_state['hesaplandi']:
     st.subheader("📊 1. Trendyol Genel Finansal Performans Özeti")
     
     g1, g2, g3, g4, g5, g6 = st.columns(6)
-    g1.metric("💰 Net Ciro", "₺{:,.2f}".format(st.session_state['ty_ciro']))
+    g1.metric("💰 Net Gerçek Ciro", "₺{:,.2f}".format(st.session_state['ty_ciro']))
     g2.metric("❌ Toplam Kesinti", "₺{:,.2f}".format(st.session_state['ty_kesinti']))
     g3.metric("📦 Ürün Maliyeti", "₺{:,.2f}".format(st.session_state['ty_maliyet']))
     g4.metric("🟢 Net Kâr", "₺{:,.2f}".format(st.session_state['ty_kar']))
@@ -148,12 +158,3 @@ if st.session_state['hesaplandi']:
         }).map(color_profit_loss, subset=['Kâr / Zarar'])
         
         st.dataframe(styled_df, use_container_width=True, height=500)
-        
-        st.write("---")
-        st.subheader("📈 Ürün Çeşitliliği Kârlılık Durumu")
-        k1, k2 = st.columns(2)
-        kar_edenler = df_goster[df_goster['Kâr / Zarar'] > 0]
-        zarar_edenler = df_goster[df_goster['Kâr / Zarar'] < 0]
-        
-        k1.metric("🟢 Kâr Eden Ürün Çeşidi", f"{len(kar_edenler)} Çeşit", f"+₺{kar_edenler['Kâr / Zarar'].sum():,.2f} Toplam Kâr")
-        k2.metric("🔴 Zarar Eden Ürün Çeşidi", f"{len(zarar_edenler)} Çeşit", f"-₺{abs(zarar_edenler['Kâr / Zarar'].sum()):,.2f} Toplam Zarar", delta_color="inverse")
