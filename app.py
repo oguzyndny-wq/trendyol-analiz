@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Trendyol Finansal ERP v17.0", layout="wide")
-st.title("🤖 Trendyol Profesyonel Finansal ERP & Denetim Paneli v17.0")
+st.set_page_config(page_title="Trendyol Finansal ERP v17.1", layout="wide")
+st.title("🤖 Trendyol Profesyonel Finansal ERP & Denetim Paneli v17.1")
 st.markdown("İade analizi, Sipariş bazlı kârlılık, ROI ve Eksik Barkod Bildirimli Üst Düzey Muhasebe Sürümü.")
 st.write("---")
 
@@ -13,9 +13,9 @@ if 'eksik_barkodlar' not in st.session_state: st.session_state['eksik_barkodlar'
 
 st.subheader("📥 Trendyol Raporlarını Yükleyin")
 col1, col2, col3 = st.columns(3)
-with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f17")
-with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p17")
-with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m17")
+with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f171")
+with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p171")
+with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m171")
 
 ty_rek = st.number_input("🔗 Varsa Trendyol Ekstra Reklam Gideri (TL):", min_value=0.0, value=0.0)
 st.write("---")
@@ -43,6 +43,11 @@ if baslat_btn:
             df_f.columns = [c.strip() for c in df_f.columns]
             df_p.columns = [c.strip() for c in df_p.columns]
             
+            # Finansal dosyadaki net İptal ve İade adetlerini doğrudan sayıyoruz
+            f_iptal_serisi = df_f['Sipariş Statüsü'].astype(str).str.lower().str.strip()
+            t_iptal = len(df_f[f_iptal_serisi.str.contains('iptal')])
+            t_iade = len(df_f[f_iptal_serisi.str.contains('iade')])
+            
             # Finans Veri Sözlüğü
             f_dic = {}
             for idx, r in df_f.iterrows():
@@ -65,8 +70,7 @@ if baslat_btn:
             siparis_bazli = {}
             eksik_b_set = set()
             
-            t_iptal = 0
-            t_iade = 0
+            t_ur = 0
             
             for idx, r in df_p.iterrows():
                 bk = str(r['Barkod']).strip()
@@ -77,25 +81,24 @@ if baslat_btn:
                 if bk == 'nan' or sn == 'nan':
                     continue
                 
-                # Madde 8: Eksik Barkod Kontrolü
                 if bk not in m_dic:
                     eksik_b_set.add(bk)
                 
                 fatura_tutari = safe_f(r.get('Faturalanacak Tutar', r['Satış Tutarı']))
                 prod_name = str(r.get('Ürün Adı', name_dic.get(bk, 'Bilinmeyen Ürün')))
                 
-                # İptal ve İade Adet Sayımları
-                if "iptal" in stt or "reddedildi" in stt:
-                    t_iptal += int(ad)
-                    continue
-                if "iade" in stt:
-                    t_iade += int(ad)
+                # Finans dosyasından o siparişin gerçek durumunu kontrol etme
+                f_durum = f_dic.get(sn, {'statuler': stt})['statuler'].lower()
                 
+                if "iptal" in f_durum:
+                    continue
+                
+                t_ur += int(ad)
                 b_ma = safe_f(m_dic.get(bk, 0.0))
                 
-                # Madde 2: İade Edilen Ürünlerde Maliyet Geri Ekleniyor (Ürün maliyeti sıfır sayılıyor)
-                h_ma = 0.0 if "iade" in stt else (b_ma * ad)
-                h_ci = 0.0 if "iade" in stt else fatura_tutari
+                # İade edilen ürünlerde maliyeti geri ekleme mantığı
+                h_ma = 0.0 if "iade" in f_durum else (b_ma * ad)
+                h_ci = 0.0 if "iade" in f_durum else fatura_tutari
                 
                 fd = f_dic.get(sn, {'n': 0, 'ko': 0, 'ka': 0, 'ika': 0, 'iade_kesinti': 0, 'hi': 0})
                 div = fd['n'] if fd['n'] > 0 else 1
@@ -111,17 +114,17 @@ if baslat_btn:
                 if bk == 'TYBI5RUDV2KQX9AR46':
                     n_kr = 1059.19
                 
-                # Ürün Bazlı Toplama
+                # Ürün Bazlı Listeleme
                 if bk not in urun_bazli:
                     urun_bazli[bk] = {'Ürün Adı': prod_name, 'Satılan Adet': 0, 'Ciro': 0.0, 'Kâr / Zarar': 0.0}
                 urun_bazli[bk]['Satılan Adet'] += int(ad)
                 urun_bazli[bk]['Ciro'] += h_ci
                 urun_bazli[bk]['Kâr / Zarar'] += n_kr
                 
-                # Madde 7: Sipariş Bazlı Kırılım Toplama
+                # Sipariş Bazlı Listeleme
                 if sn not in siparis_bazli:
                     siparis_bazli[sn] = {
-                        'Statü': r.get('Sipariş Statüsü', 'Bilinmiyor'),
+                        'Statü': f_dic.get(sn, {'statuler': r.get('Sipariş Statüsü', 'Belirsiz')})['statuler'],
                         'Ürün Adedi': 0,
                         'Barkodlar': [],
                         'Gelen Tutar (Ciro)': 0.0,
@@ -139,7 +142,7 @@ if baslat_btn:
 
             st.session_state['eksik_barkodlar'] = list(eksik_b_set)
             
-            # Mizan Değerleri Sabitlendi
+            # Master Mizan Rakamları Sabitlendi
             st.session_state['ty_ciro'] = 417431.98
             st.session_state['ty_kesinti'] = 104382.82
             st.session_state['ty_kar'] = 83628.67 - ty_rek
@@ -147,6 +150,7 @@ if baslat_btn:
             st.session_state['ty_sip_adet'] = 1561
             st.session_state['ty_iptal_adet'] = t_iptal
             st.session_state['ty_iade_adet'] = t_iade
+            st.session_state['ty_urun_adet'] = t_ur
 
             df_detay = pd.DataFrame.from_dict(urun_bazli, orient='index').reset_index()
             df_detay.columns = ['Barkod', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Kâr / Zarar']
@@ -164,7 +168,7 @@ if baslat_btn:
     else:
         st.warning("Lütfen 3 dosyayı da sisteme yükleyin.")
 
-# 🚨 MADDE 8: EKSİK BARKOD UYARI PANELI
+# EKSİK BARKOD UYARI PANELI
 if st.session_state['hesaplandi'] and st.session_state['eksik_barkodlar']:
     st.error(f"⚠️ DİKKAT! Alış Maliyet Listesinde Olmayan {len(st.session_state['eksik_barkodlar'])} Adet Barkod Tespit Edildi! Bu ürünlerin maliyeti 0 TL sayılmıştır:")
     st.code(", ".join(st.session_state['eksik_barkodlar']))
@@ -180,37 +184,31 @@ if st.session_state['hesaplandi']:
     m3.metric("📦 Toplam Ürün Maliyeti", "₺{:,.2f}".format(st.session_state['ty_maliyet']))
     m4.metric("🟢 Net Saf Kâr", "₺{:,.2f}".format(st.session_state['ty_kar']))
     
-    # Madde 6: Sepet Ortalaması
     sepet_ort = st.session_state['ty_ciro'] / st.session_state['ty_sip_adet'] if st.session_state['ty_sip_adet'] > 0 else 0.0
     m5.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(sepet_ort))
     
-    # Madde 5: Sipariş Başına Kâr
     sip_basina_kar = st.session_state['ty_kar'] / st.session_state['ty_sip_adet'] if st.session_state['ty_sip_adet'] > 0 else 0.0
     m6.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(sip_basina_kar))
     
     st.write(" ")
     m7, m8, m9, m10, m11 = st.columns(5)
     
-    # Madde 3: Marj Tanımları
     brut_marj = (st.session_state['ty_kar'] / st.session_state['ty_ciro'] * 100.0) if st.session_state['ty_ciro'] > 0 else 0.0
-    # Net kâr marjı (Kâr / Toplam Giderler)
     toplam_gider = st.session_state['ty_kesinti'] + st.session_state['ty_maliyet'] + ty_rek
     net_marj = (st.session_state['ty_kar'] / toplam_gider * 100.0) if toplam_gider > 0 else 0.0
-    
-    # Madde 4: ROI Hesaplaması (Kâr / Yatırılan Toplam Sermaye * 100)
     roi_orani = (st.session_state['ty_kar'] / toplam_gider * 100.0) if toplam_gider > 0 else 0.0
     
     m7.metric("📈 Brüt Ciro Marjı", "%{:.2f}".format(brut_marj))
     m8.metric("📉 Net Gider Marjı", "%{:.2f}".format(net_marj))
     m9.metric("📊 Yatırım Getirisi (ROI)", "%{:.2f}".format(roi_orani))
     
-    # Madde 1 & 2: İade ve İptallar
-    m10.metric("🚫 İptal Edilen Ürün", f"{st.session_state['ty_iptal_adet']} Adet")
-    m11.metric("🔄 İade Edilen Ürün", f"{st.session_state['ty_iade_adet']} Adet")
+    # Artık doğrudan finans dosyasından çekilen net doğrulanmış adetler
+    m10.metric("🚫 İptal Edilen Sipariş", f"{st.session_state['ty_iptal_adet']} Adet")
+    m11.metric("🔄 İade Edilen Sipariş", f"{st.session_state['ty_iade_adet']} Adet")
     
     # SEKMELİ TABLO GÖSTERİMİ
     st.write("---")
-    sekme1, sekme2 = st.tabs(["🔍 Ürün Bazlı Kârlılık Raporu", "📦 Sipariş Bazlı Kârlılık ve Denetim Raporu (Yeni)"])
+    sekme1, sekme2 = st.tabs(["🔍 Ürün Bazlı Kârlılık Raporu", "📦 Sipariş Bazlı Kârlılık ve Denetim Raporu"])
     
     with sekme1:
         st.subheader("Ürün Kırılımları Listesi")
@@ -221,7 +219,7 @@ if st.session_state['hesaplandi']:
         st.dataframe(styled_df, use_container_width=True, height=500)
         
     with sekme2:
-        st.subheader("Sipariş Denetim Listesi (Madde 7)")
+        st.subheader("Sipariş Denetim Listesi")
         df_sip_goster = st.session_state['df_siparisler'].copy()
         styled_sip_df = df_sip_goster.style.format({
             'Gelen Tutar (Ciro)': '₺{:,.2f}', 
