@@ -4,9 +4,9 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.7", layout="wide")
+st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.8", layout="wide")
 
-st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.7 (Hatasız Tekli Barkod)")
+st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.8 (Nihai Stabil Sürüm)")
 st.markdown("Fiyat tavsiyeleri, reklam motoru ve tekli barkod yazdırma istasyonu entegre edilmiştir.")
 st.write("---")
 
@@ -182,7 +182,6 @@ if 'df_sonuc' in st.session_state:
             urun_bilgi = df_filtre.iloc[0]
             st.write("### 🖨️ Yazıcı Çıktı Önizlemesi")
             
-            # Tırnak hatasını önlemek için CSS'i düz metin formatında güvenli birleştirdik
             m_ad = str(urun_bilgi['Marka']).upper()
             u_ad = str(urun_bilgi['Ürün Adı'])[:60]
             b_no = str(aranan_barkod)
@@ -195,8 +194,69 @@ if 'df_sonuc' in st.session_state:
             html_sablon += '<p style="text-align: center; font-size: 12px; margin: 5px 0 0 0;">Barkod No: ' + b_no + '</p></div>'
             
             st.markdown(html_sablon, unsafe_allow_html=True)
-            st.info("💡 Bu tekli barkodu yazdırmak için bilgisayarınızdan **CTRL + P** tuşlarına olun. Yazıcı ayarlarından 'Yalnızca Seçimi Yazdır'ı seçerek doğrudan termal etiket çıkartabilirsiniz!")
+            st.info("💡 Bu tekli barkodu yazdırmak için bilgisayarınızdan CTRL + P tuşlarına basın. Yazıcı ayarlarından Yalnızca Seçimi Yazdır seçeneğini işaretleyerek doğrudan termal etiket çıkartabilirsiniz!")
 
     # 💡 YAPAY ZEKA ZAM TAVSİYELERİ
     st.write("---")
-    st.subheader("💡 Yapay Zeka Akıllı
+    st.subheader("💡 Yapay Zeka Akıllı Fiyatlandırma ve Zam Tavsiyeleri")
+    
+    df_urun_analiz = df_sonuc.groupby(['Barkod', 'Marka', 'Ürün Adı']).agg({
+        'Net Ciro': 'sum',
+        'Net Kâr': 'sum',
+        'Satış Adedi': 'sum',
+        'Komisyon': 'sum',
+        'Kargo': 'sum'
+    }).reset_index()
+    
+    tavsiye_listesi = []
+    for idx, row in df_urun_analiz.iterrows():
+        if row['Satış Adedi'] > 0:
+            birim_ciro = row['Net Ciro'] / row['Satış Adedi']
+            birim_kar = row['Net Kâr'] / row['Satış Adedi']
+            birim_kesinti_orani = abs(row['Komisyon'] + row['Kargo']) / row['Net Ciro'] if row['Net Ciro'] > 0 else 0.30
+            
+            if birim_kar < 0:
+                gerekli_fiyat_artisi = abs(birim_kar) * (1 + birim_kesinti_orani)
+                tavsiye_listesi.append({
+                    "Barkod": row['Barkod'],
+                    "Marka": row['Marka'],
+                    "Ürün Adı": row['Ürün Adı'],
+                    "Mevcut Birim Kâr": f"₺{birim_kar:.2f}",
+                    "Durum": "🔴 ZARAR EDİYOR",
+                    "AI Tavsiyesi": f"Trendyol Satış Fiyatını En Az ₺{gerekli_fiyat_artisi:.2f} ARTIRMALISINIZ!"
+                })
+    
+    if tavsiye_listesi:
+        st.dataframe(pd.DataFrame(tavsiye_listesi), use_container_width=True)
+    else:
+        st.success("✅ Harika! Bu ay zarar eden hiçbir ürününüz bulunmuyor.")
+
+    # 🍕 GİDER PASTASI GRAFİĞİ
+    st.write("---")
+    st.write("### 🍕 Toplam Cironun Gider Dağılım Röntgeni")
+    gider_data = {
+        "Gider Kalemi": ["Net Kâr", "Ürün Maliyetleri", "Trendyol Komisyonu", "Kargo Giderleri", "Platform Hiz & Reklam"],
+        "Tutar": [
+            max(0, st.session_state['genel_net_kar']),
+            st.session_state['toplam_maliyet_gideri'],
+            abs(st.session_state['toplam_komisyon']),
+            abs(st.session_state['toplam_kargo']),
+            abs(st.session_state['toplam_hizmet']) + st.session_state['reklam_gideri']
+        ]
+    }
+    fig_pie = px.pie(pd.DataFrame(gider_data), values='Tutar', names='Gider Kalemi', title="Cironuzun Dağılımı (%)", hole=0.4)
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+    # 📥 EXCEL İNDİRME BUTONU
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_sonuc.to_excel(writer, index=False, sheet_name='AI Pro Raporu')
+    
+    st.write("---")
+    st.download_button(
+        label="📥 Tüm Sonuçları Detaylı Excel Olarak İndir",
+        data=output.getvalue(),
+        file_name="Trendyol_AI_Analizi.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
