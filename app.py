@@ -4,10 +4,10 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Konsolide E-Ticaret Yönetim Paneli v8.5", layout="wide")
+st.set_page_config(page_title="Konsolide E-Ticaret Yönetim Paneli v8.6", layout="wide")
 
-st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v8.5")
-st.markdown("Değişken eşitleme hatası giderilmiştir. Tüm veriler dosyalardan anlık hesaplanır.")
+st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v8.6")
+st.markdown("Python operatör hatası giderilmiştir. Tüm veriler dosyalardan anlık hesaplanır.")
 st.write("---")
 
 # SEKME SİSTEMİ
@@ -68,7 +68,8 @@ def clean_amazon_net_kazanc(val):
     if val_str.startswith('-') and '-' in val_str[1:]: return 0.0
     try:
         num = float(val_str.replace(',', '.'))
-        if '.' not in val_str && abs(num) > 100000: return num / 10000.0
+        # Hatalı olan '&&' işareti burada 'and' olarak düzeltildi
+        if '.' not in val_str and abs(num) > 100000: return num / 10000.0
         return num
     except: return 0.0
 
@@ -76,18 +77,5 @@ if baslat_btn:
     st.session_state['hesaplandi'] = False
     ty_aktif, amz_aktif = False, False
     
-    # Sıfırlama Sayaçları (Hata Alan Bölüm Düzeltildi)
-    ty_ciro, ty_kesinti, ty_maliyet_gideri, ty_kar = 0.0, 0.0, 0.0, 0.0
-    ty_sip_adet, ty_urun_adet = 0, 0
-    
-    amz_ciro, amz_kesinti, amz_maliyet_gideri, amz_kar = 0.0, 0.0, 0.0, 0.0
-    amz_sip_adet, amz_urun_adet = 0, 0
-    
-    df_ty_final, df_amz_final = pd.DataFrame(), pd.DataFrame()
-    
-    # 🧡 TRENDYOL HESAPLAMA MOTORU
-    if finans_file and prod_file and maliyet_file:
-        try:
-            df_finans = pd.read_excel(finans_file)
-            df_prod = pd.read_excel(prod_file, skiprows=1)
-            df_maliyet = pd.read_excel(maliyet_file)
+    # Sıfırlama Sayaçları
+    ty_ciro, ty_kesinti
