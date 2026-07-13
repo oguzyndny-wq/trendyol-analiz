@@ -2,16 +2,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5", layout="wide")
+st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.1", layout="wide")
 
-st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5 (AI PRO - Stabil)")
-st.markdown("Fiyat tavsiyeleri, reklam verimlilik motoru ve %100 stabil etiket üretici entegre edilmiştir.")
+st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.1 (AI PRO - %100 Güvenli)")
+st.markdown("Fiyat tavsiyeleri, reklam verimlilik motoru ve dijital paketleme/barkod listesi entegre edilmiştir.")
 st.write("---")
 
 # 1. DOSYA YÜKLEME ALANLARI
@@ -34,51 +30,10 @@ st.write("---")
 # Reklam Gideri Giriş Alanı
 reklam_gideri = st.number_input("🔗 Varsa Bu Aya Ait Toplam Reklam Giderini Giriş Yapın (TL):", min_value=0.0, value=0.0, step=100.0)
 
-# Güvenli PDF Etiket Oluşturma Fonksiyonu (Çökmeyi Önleyen Yeni Sistem)
-def generate_safe_pdf(df):
-    buffer = io.BytesIO()
-    # Standart A4 boyutunda şık bir etiket listesi dökümü yapıyoruz
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-    story = []
-    
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading2'], textColor=colors.HexColor('#FF1493'))
-    text_style = ParagraphStyle('TextStyle', parent=styles['Normal'], fontSize=10, leading=14)
-    
-    story.append(Paragraph("<b>🖨️ PAKETLEME VE BARKOD ETİKET LİSTESİ</b>", title_style))
-    story.append(Spacer(1, 15))
-    
-    unique_products = df[df['Durum'] == 'Satış'][['Barkod', 'Marka', 'Ürün Adı']].drop_duplicates()
-    
-    table_data = [["MARKA", "ÜRÜN ADI", "TÜKETİCİ BARKODU"]]
-    for idx, row in unique_products.iterrows():
-        table_data.append([
-            str(row['Marka']),
-            str(row['Ürün Adı'])[:50],
-            f"*{str(row['Barkod']).strip()}*" # Termal okuyucuların da rahat tanıması için standart format
-        ])
-    
-    t = Table(table_data, colWidths=[100, 300, 140])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2F4F4F')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 8),
-        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#F5F5F5')),
-        ('GRID', (0,0), (-1,-1), 1, colors.HexColor('#D3D3D3')),
-        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,1), (-1,-1), 9),
-    ]))
-    
-    story.append(t)
-    doc.build(story)
-    return buffer.getvalue()
-
 # ANALİZİ BAŞLAT BUTONU
 if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=True):
     if finans_file and prod_file and maliyet_file:
-        with st.spinner("Yapay zeka motoru fiyatları optimize ediyor, verileri işliyor..."):
+        with st.spinner("Yapay zeka motoru finansal röntgeninizi çıkarıyor..."):
             
             # Verileri Oku
             df_finans = pd.read_excel(finans_file)
@@ -186,7 +141,7 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
             iade_rows = len(df_sonuc[df_sonuc['Durum'] == 'İade'])
             iade_orani = (iade_rows / total_rows) * 100 if total_rows > 0 else 0
             
-            # Üst Özet Kartları
+            # Özet Kartları
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("💰 Net Ciro (İadeler Hariç)", f"₺{toplam_ciro:,.2f}")
             m2.metric("🟢 Gerçek Net Kâr", f"₺{genel_net_kar:,.2f}")
@@ -262,17 +217,24 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
             fig_pie = px.pie(df_gider_pasta, values='Tutar', names='Gider Kalemi', title="Cironuzun Dağılım Tablosu (%)", hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
             
-            # OPERASYON PANELI (SABIT ETİKET PDF)
+            # OPERASYON PANELI (DİJİTAL PAKETLEME LİSTESİ)
             st.write("---")
-            st.subheader("🖨️ Operasyon ve Paketleme Kolaylığı")
-            pdf_data = generate_safe_pdf(df_sonuc)
-            st.download_button(
-                label="🖨️ Satılan Ürünlerin Paketleme Listesini ve Barkodlarını İndir (Hazır PDF)",
-                data=pdf_data,
-                file_name="Paketleme_Ve_Barkod_Etiketleri.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
+            st.subheader("🖨️ Operasyon, Paketleme ve Dijital Barkod Listesi")
+            df_dijital_barkod = df_sonuc[df_sonuc['Durum'] == 'Satış'][['Marka', 'Ürün Adı', 'Barkod']].drop_duplicates()
+            st.dataframe(df_dijital_barkod, use_container_width=True)
+            
+            # 🏢 Marka Analizi
+            st.write("---")
+            st.write("### 🏢 Marka Bazlı Detaylı Performans")
+            df_marka = df_sonuc.groupby('Marka').agg({'Net Ciro':'sum', 'Net Kâr':'sum', 'Satış Adedi':'sum'}).reset_index()
+            st.dataframe(df_marka.style.format({'Net Ciro': '₺{:.2f}', 'Net Kâr': '₺{:.2f}'}), use_container_width=True)
+            
+            # 🔍 EKSİK MALİYET DEDEKTİFİ
+            if eksik_maliyetler:
+                st.write("---")
+                st.warning("⚠️ Maliyet Listesinde Olmadığı İçin Kârı Yanıltan Barkodlar:")
+                df_eksik = pd.DataFrame(list(eksik_maliyetler), columns=["Barkod", "Ürün Adı"])
+                st.dataframe(df_eksik, use_container_width=True)
             
             # Excel İndirme
             output = io.BytesIO()
