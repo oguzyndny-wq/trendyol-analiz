@@ -4,7 +4,7 @@ import datetime
 
 st.set_page_config(page_title="Konsolide ERP Premium", layout="wide")
 
-# 🎨 🎯 KESİN ÇÖZÜM: st.markdown yerine st.html kullanarak Python 3.14 çakışmasını engelliyoruz
+# 🎨 🎯 ST.HTML İLE PYTHON 3.14 VE GÖRSEL CEO CİLASI ENTEGRASYONU
 st.html("""
     <style>
     /* Ana Arka Plan ve Yazı Tipi */
@@ -336,7 +336,7 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Amazon Motoru Hatası: {str(e)}")
 
-# 👑 3. PREMIUM KONSOLİDE ÜST PANEL VE METRİKLER
+# 👑 3. PREMIUM KONSOLİDE ÜST PANEL VE METRİKLER (🎯 YÜZDELİK FORMATLAR SABİTLENDİ)
 if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     st.write("---")
     st.subheader("👑 Şirketler Grubu Konsolide Finansal Özet Paneli")
@@ -362,10 +362,10 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     g_sepet = total_ciro / total_sip if total_sip > 0 else 0.0
     g_sip_kar = total_kar / total_sip if total_sip > 0 else 0.0
     
-    cc1.metric("📊 Yatırım Getirisi (ROI)", "%{:.2f}".format(g_roi))
-    cc2.metric("📈 Net Kâr Marjı (%)", "%{:.2f}".format(g_marj))
-    cc3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(g_sepet))
-    cc4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(g_sip_kar))
+    cc1.metric("📊 Yatırım Getirisi (ROI)", "%{:,.2f}".format(g_roi))
+    cc2.metric("📈 Net Kâr Marjı", "%{:,.2f}".format(g_marj))
+    cc3.metric("🛒 Sepet Ortalaması", "₺{:,.2f}".format(g_sepet))
+    cc4.metric("💵 Sipariş Başı Kâr", "₺{:,.2f}".format(g_sip_kar))
     
     # 📉 Global Başabaş Noktası Kutusu
     st.write(" ")
@@ -401,6 +401,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             st.bar_chart(chart_data_gider, x='Gider Kalemi', y='Tutar', color='#e67e22')
 
     st.write("---")
+    st.markdown('<div class="tab-holder"></div>', unsafe_html=True)
     s_ty, s_amz = st.tabs(["🟢 TRENDYOL DETAYLI ERP PANELİ", "🟠 AMAZON DETAYLI ERP PANELİ"])
     
     with s_ty:
@@ -408,7 +409,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             if st.session_state['eksik_barkodlar_ty']:
                 st.error(f"⚠️ MALİYETİ OLMAYAN TRENDYOL BARKODLARI: {', '.join(st.session_state['eksik_barkodlar_ty'])}")
             
-            # ALARM: Trendyol Ölü Ürün Alarmları Tablosu
             if st.session_state['df_olu_urunler_ty'] is not None:
                 st.markdown("### 🚨 Kritik Müdahale Gereken Ölü Ürünler Alarmı (Trendyol)")
                 st.dataframe(st.session_state['df_olu_urunler_ty'].style.format({'Net Kâr / Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Net Kâr / Zarar']), use_container_width=True, height=150)
@@ -426,15 +426,15 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             m2.metric("Kesintiler", "₺{:,.2f}".format(st.session_state['ty_kesinti']))
             m3.metric("Net Kâr", "₺{:,.2f}".format(st.session_state['ty_kar']))
             m4.metric("🚫 İptal / 🔄 İade", f"{st.session_state['ty_iptal_adet']} / {st.session_state['ty_iade_adet']} Adet")
-            m5.metric("ROAS", "{:.1f}x".format(ty_roas) if ty_rek > 0 else "YOK")
+            m5.metric("ROAS", "{:,.1f}x".format(ty_roas) if ty_rek > 0 else "YOK")
             m6.metric("Ürün Adedi", f"{int(st.session_state['ty_urun_adet'])} Adet")
             
             st.write(" ")
             mm1, mm2, mm3, mm4 = st.columns(4)
-            mm1.metric("📊 Yatırım Getirisi (ROI)", "%{:.2f}".format(ty_roi))
-            mm2.metric("📈 Net Kâr Marjı (%)", "%{:.2f}".format(ty_marj))
-            mm3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(ty_sepet))
-            mm4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(ty_sip_k))
+            mm1.metric("📊 Yatırım Getirisi (ROI)", "%{:,.2f}".format(ty_roi))
+            mm2.metric("📈 Net Kâr Marjı", "%{:,.2f}".format(ty_marj))
+            mm3.metric("🛒 Sepet Ortalaması", "₺{:,.2f}".format(ty_sepet))
+            mm4.metric("💵 Sipariş Başı Kâr", "₺{:,.2f}".format(ty_sip_k))
             
             st.write(" ")
             sekme_ty1, sekme_ty2, sekme_ty3 = st.tabs(["🔍 Ürün Bazlı Analiz ve Stok Hızı", "📦 Sipariş Bazlı Denetim Raporu", "📅 Nakit Akış Planlama"])
@@ -449,7 +449,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             
     with s_amz:
         if st.session_state['hesaplandi_amz']:
-            # ALARM: Amazon Zarar Eden Ürün Alarmları Tablosu
             if st.session_state['df_olu_urunler_amz'] is not None:
                 st.markdown("### 🚨 Kritik Müdahale Gereken Ölü Ürünler Alarmı (Amazon)")
                 st.dataframe(st.session_state['df_olu_urunler_amz'].style.format({'Ciro': '₺{:,.2f}', 'Net Kâr / Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Net Kâr / Zarar']), use_container_width=True, height=150)
@@ -462,17 +461,17 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             amz_sip_k = st.session_state['amz_kar'] / st.session_state['amz_sip_adet'] if st.session_state['amz_sip_adet'] > 0 else 0.0
             
             a1, a2, a3, a4 = st.columns(4)
-            a1.metric("Net Ciro", "₺{:,.2f}".format(st.session_state['amz_ciro']))
+            a1.metric("Amazon Net Ciro", "₺{:,.2f}".format(st.session_state['amz_ciro']))
             a2.metric("Toplam Kesinti (Mizan)", "₺{:,.2f}".format(st.session_state['amz_kesinti']))
             a3.metric("Net Kâr", "₺{:,.2f}".format(st.session_state['amz_kar']))
             a4.metric("🚫 İptal / 🔄 İade", f"{st.session_state['amz_iptal_adet']} / {st.session_state['amz_iade_adet']} Adet")
             
             st.write(" ")
             aa1, aa2, aa3, aa4 = st.columns(4)
-            aa1.metric("📊 Yatırım Getirisi (ROI)", "%{:.2f}".format(amz_roi))
-            aa2.metric("📈 Net Kâr Marjı (%)", "%{:.2f}".format(amz_marj))
-            aa3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(amz_sepet))
-            aa4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(amz_sip_k))
+            aa1.metric("📊 Yatırım Getirisi (ROI)", "%{:,.2f}".format(amz_roi))
+            aa2.metric("📈 Net Kâr Marjı", "%{:,.2f}".format(amz_marj))
+            aa3.metric("🛒 Sepet Ortalaması", "₺{:,.2f}".format(amz_sepet))
+            aa4.metric("💵 Sipariş Başı Kâr", "₺{:,.2f}".format(amz_sip_k))
             
             st.markdown("#### 🔍 Amazon Doğrulanmış Gider Analiz Kartları")
             g1, g2, g3 = st.columns(3)
