@@ -4,9 +4,9 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.3", layout="wide")
+st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.5", layout="wide")
 
-st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.3 (Tekli Barkod Destekli)")
+st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.5 (Sorunsuz Tekli Barkod)")
 st.markdown("Fiyat tavsiyeleri, reklam motoru ve tekli barkod yazdırma istasyonu entegre edilmiştir.")
 st.write("---")
 
@@ -127,8 +127,22 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
                         "Net Kâr": net_kar
                     })
                     
-                # Sonuçları Session State'e kaydet (Arama yaparken sıfırlanmasın)
-                st.session_state['df_sonuc'] = pd.DataFrame(sonuc_listesi)
+                df_final = pd.DataFrame(sonuc_listesi)
+                
+                # METRİKLER
+                toplam_ciro = df_final['Net Ciro'].sum()
+                toplam_kargo = df_final['Kargo'].sum()
+                toplam_komisyon = df_final['Komisyon'].sum()
+                toplam_hizmet = df_final['Hizmet Bedeli'].sum()
+                toplam_maliyet_gideri = df_final['Ürün Maliyeti'].sum()
+                genel_net_kar = df_final['Net Kâr'].sum() - reklam_gideri
+                
+                total_rows = len(df_final)
+                iade_rows = len(df_final[df_final['Durum'] == 'İade'])
+                iade_orani = (iade_rows / total_rows) * 100 if total_rows > 0 else 0
+                
+                # Verileri Hafızaya Al (Session State)
+                st.session_state['df_sonuc'] = df_final
                 st.session_state['toplam_ciro'] = toplam_ciro
                 st.session_state['genel_net_kar'] = genel_net_kar
                 st.session_state['iade_orani'] = iade_orani
@@ -139,12 +153,12 @@ if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=T
                 st.session_state['toplam_komisyon'] = toplam_komisyon
                 st.session_state['toplam_kargo'] = toplam_kargo
                 st.session_state['toplam_hizmet'] = toplam_hizmet
-                st.success("✅ Analiz başarıyla tamamlandı! Aşağıdaki panelleri inceleyebilirsiniz.")
+                st.success("✅ Analiz başarıyla tamamlandı! Aşağıdaki paneller aktifleşti.")
                 
             except Exception as e:
                 st.error(f"📊 Veri İşleme Hatası: {str(e)}")
 
-# EĞER ANALİZ YAPILDIYSA EKRANA PANELLERİ GETİR
+# EĞER HESAPLAMA YAPILDIYSA EKRANI ÇİZ
 if 'df_sonuc' in st.session_state:
     df_sonuc = st.session_state['df_sonuc']
     
@@ -155,22 +169,33 @@ if 'df_sonuc' in st.session_state:
     m3.metric("📦 Genel İade Oranı", f"%{st.session_state['iade_orani']:.2f}")
     m4.metric("🚨 İade Kargo Zararı", f"₺{st.session_state['toplam_iade_kargo_zarari']:,.2f}")
     
-    # 🎯 YENİ EKSTRE ÖZELLİK: TEKLİ BARKOD YAZDIRMA İSTASYONU
+    # 🔎 TEKLİ BARKOD YAZDIRMA İSTASYONU
     st.write("---")
     st.subheader("🎯 Tekli Barkod Arama ve Yazdırma İstasyonu")
-    st.markdown("Aşağıdaki kutuya yazdırılacak barkodu girin. Sistem sadece o ürünü termal boyuta getirecektir.")
     
-    # Benzersiz barkod listesini alıp arama kutusu yapalım
     barkod_listesi = ["Seçiniz..."] + list(df_sonuc['Barkod'].unique())
     aranan_barkod = st.selectbox("🔎 Yazdırılacak Barkodu Seçin veya Yazın:", barkod_listesi)
     
     if aranan_barkod != "Seçiniz...":
-        # Sadece o barkoda ait bilgiyi çek
-        urun_bilgi = df_sonuc[df_sonuc['Barkod'] == aranan_barkod].iloc[0]
-        
-        # Sadece Termal Yazıcı Şablonu (Kutucuk şeklinde şık tasarım)
-        st.write("### 🖨️ Yazıcı Çıktı Önizlemesi")
-        
-        # Bu alan tam olarak 100x100 etiket formatında görünecek
-        st.markdown(f"""
-        <div style="border: 3px solid black; padding:
+        df_filtre = df_sonuc[df_sonuc['Barkod'] == aranan_barkod]
+        if not df_filtre.empty:
+            urun_bilgi = df_filtre.iloc[0]
+            st.write("### 🖨️ Yazıcı Çıktı Önizlemesi")
+            
+            # HTML Tasarımını Güvenli Bir Şekilde f-string Formatına Aldık
+            etiket_html = f"""
+            <div style="border: 3px solid black; padding: 20px; width: 350px; background-color: white; color: black; font-family: Arial; border-radius: 5px;">
+                <h2 style="margin: 0; padding-bottom: 5px; border-bottom: 2px solid black;">{str(urun_bilgi['Marka']).upper()}</h2>
+                <p style="font-size: 14px; margin: 10px 0;"><b>Ürün:</b> {str(urun_bilgi['Ürün Adı'])[:60]}</p>
+                <div style="background-color: black; color: white; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin-top: 20px;">
+                    |||| {str(aranan_barkod)} ||||
+                </div>
+                <p style="text-align: center; font-size: 12px; margin: 5px 0 0 0;">Barkod No: {str(aranan_barkod)}</p>
+            </div>
+            """
+            st.markdown(etiket_html, unsafe_allow_html=True)
+            st.info("💡 Bu tekli barkodu yazdırmak için bilgisayarınızdan **CTRL + P** tuşlarına basın. Yazıcı ayarlarından 'Yalnızca Seçimi Yazdır'ı seçerek doğrudan termal etiket çıkartabilirsiniz!")
+
+    # 💡 YAPAY ZEKA ZAM TAVSİYELERI
+    st.write("---")
+    st.subheader("💡 Yapay Zeka Akıllı Fiyatland
