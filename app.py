@@ -4,10 +4,10 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Konsolide E-Ticaret Yapay Zeka Paneli v7.1", layout="wide")
+st.set_page_config(page_title="Konsolide E-Ticaret Yapay Zeka Paneli v7.2", layout="wide")
 
-st.title("🤖 Çok Kanallı (Trendyol & Amazon) Akıllı Yapay Zeka Paneli v7.1")
-st.markdown("Amazon veri tipi uyuşmazlıkları ve tarih dönüşüm hataları giderilmiştir.")
+st.title("🤖 Çok Kanallı (Trendyol & Amazon) Akıllı Yapay Zeka Paneli v7.2")
+st.markdown("Amazon'daki bozuk kuruş, nokta ve virgül işaretleri tamamen temizlenmiştir.")
 st.write("---")
 
 # SEKME SİSTEMİ
@@ -23,7 +23,7 @@ with tab_yükleme:
     with col3:
         maliyet_file = st.file_uploader("Trendyol Maliyet listesi dosyası", type=["xlsx", "xls"], key="maliyet")
         
-    ty_reklam = st.number_input("🔗 Varsa Trendyol Bu Aya Ait Toplam Ekstra Reklam Gider Mi? (TL):", min_value=0.0, value=0.0, step=100.0)
+    ty_reklam = st.number_input("🔗 Varsa Trendyol Bu Aya Ait Toplam Ekstra Reklam Gideri (TL):", min_value=0.0, value=0.0, step=100.0)
 
     st.write("---")
     st.subheader("2. Amazon Raporları")
@@ -36,17 +36,36 @@ with tab_yükleme:
     st.write("---")
     baslat_btn = st.button("🚀 Tüm Pazaryerlerinin Akıllı Analizini Başlat", use_container_width=True)
 
-# GÜVENLİ SAYI DÖNÜŞTÜRÜCÜ MOTOR (Hatanın Panzehiri)
-def safe_float(val):
+# 🧙‍♂️ GELİŞMİŞ SAYI TEMİZLEME SİHİRBAZI (Saçma Rakamların Panzehiri)
+def clean_amazon_number(val):
     if pd.isnull(val):
         return 0.0
     if isinstance(val, (int, float)):
         return float(val)
-    # Eğer hücreye yanlışlıkla tarih objesi gelmişse 0.0 dön ki çökmesin
     if hasattr(val, 'strftime'): 
         return 0.0
+    
     try:
-        return float(str(val).strip().replace(',', '.'))
+        val_str = str(val).strip()
+        # Eğer hem nokta hem virgül varsa (Örn: 1,15.11400 veya 1.151,14 gibi)
+        if ',' in val_str and '.' in val_str:
+            # Son işarete bakarak kuruş ayracını bulalım
+            if val_str.rfind(',') > val_str.rfind('.'):
+                # Noktalar binlik ayracıdır, sil. Virgülü noktaya çevir.
+                val_str = val_str.replace('.', '').replace(',', '.')
+            else:
+                # Virgüller binlik ayracıdır, sil.
+                val_str = val_str.replace(',', '')
+        else:
+            # Sadece tek bir ayraç varsa kuruşa göre çevir
+            val_str = val_str.replace(',', '.')
+            
+        # Çift nokta kalmışsa temizle
+        if val_str.count('.') > 1:
+            parts = val_str.split('.')
+            val_str = "".join(parts[:-1]) + "." + parts[-1]
+            
+        return float(val_str)
     except:
         return 0.0
 
@@ -74,10 +93,10 @@ if baslat_btn:
             for idx, row in df_finans.iterrows():
                 s_no = str(row['Sipariş No']).strip()
                 finans_dict[s_no] = {
-                    'toplam_adet': safe_float(row['Ürün Adedi']),
-                    'komisyon': safe_float(row['Komisyon/Yurt Dışı Stok Destek Bedeli']),
-                    'kargo': safe_float(row['Gönderi Kargo Bedeli']),
-                    'hizmet': safe_float(row['Platform Hizmet Bedeli'])
+                    'toplam_adet': clean_amazon_number(row['Ürün Adedi']),
+                    'komisyon': clean_amazon_number(row['Komisyon/Yurt Dışı Stok Destek Bedeli']),
+                    'kargo': clean_amazon_number(row['Gönderi Kargo Bedeli']),
+                    'hizmet': clean_amazon_number(row['Platform Hizmet Bedeli'])
                 }
                 
             maliyet_dict = dict(zip(df_maliyet['TRENDYOL BARKOD'].astype(str).str.strip(), df_maliyet['TOPLAM MALİYET']))
@@ -87,8 +106,8 @@ if baslat_btn:
                 barkod = str(row['Barkod']).strip()
                 siparis_no = str(row['Sipariş Numarası']).strip()
                 statü = str(row.get('Statü', row.get('Sipariş Durumu', ''))).strip().lower()
-                adet = safe_float(row['Adet'])
-                satis_tutari = safe_float(row['Satış Tutarı'])
+                adet = clean_amazon_number(row['Adet'])
+                satis_tutari = clean_amazon_number(row['Satış Tutarı'])
                 
                 if barkod == 'nan' or siparis_no == 'nan':
                     continue
@@ -99,7 +118,7 @@ if baslat_btn:
                 if "iptal" in statü or "reddedildi" in statü:
                     continue
                 
-                birim_maliyet = safe_float(maliyet_dict.get(barkod, 0.0))
+                birim_maliyet = clean_amazon_number(maliyet_dict.get(barkod, 0.0))
                 toplam_maliyet = birim_maliyet * adet
                 is_iade = "iade" in statü
                 
@@ -167,114 +186,4 @@ if baslat_btn:
             
             amz_sonuc = []
             for idx, row in df_amz_sales.iterrows():
-                asin = str(row['Ana ürün ASIN\'i']).strip()
-                satilan_birim = safe_float(row.get('Satılan birimler', 0))
-                iade_birim = safe_float(row.get('İade edilen birimler', 0))
-                net_birim = safe_float(row.get('Satılan net birim sayısı', 0))
-                
-                satis_tutari = safe_float(row.get('Satış', 0.0))
-                net_kazanc = safe_float(row.get('Toplam Net kazanç', 0.0))
-                
-                amz_iptal_iade += iade_birim
-                
-                birim_maliyet = safe_float(amz_cost_dict.get(asin, 0.0))
-                toplam_maliyet = birim_maliyet * max(0.0, net_birim)
-                
-                kesinti = satis_tutari - net_kazanc
-                net_kar = net_kazanc - toplam_maliyet
-                
-                amz_sonuc.append({
-                    "Pazaryeri": "Amazon",
-                    "Sipariş No/ASIN": asin,
-                    "Barkod": asin,
-                    "Ürün Adı": f"Amazon ASIN: {asin}",
-                    "Durum": "Net Satış",
-                    "Adet": net_birim,
-                    "Ciro": satis_tutari,
-                    "Kesinti": -kesinti,
-                    "Maliyet": toplam_maliyet,
-                    "Net Kâr": net_kar
-                })
-                
-            df_amz_final = pd.DataFrame(amz_sonuc)
-            amz_ciro = df_amz_final['Ciro'].sum()
-            amz_hakedis = df_amz_final['Ciro'].sum() + df_amz_final['Kesinti'].sum() # İçerideki hakediş hesabı
-            amz_kesinti = amz_ciro - amz_hakedis
-            amz_kar = df_amz_final['Net Kâr'].sum()
-            amz_aktif = True
-            
-        except Exception as e:
-            st.error(f"Amazon Veri İşleme Hatası: {str(e)}")
-
-    # -----------------------------
-    # SESSION STATE KORUMA
-    # -----------------------------
-    if ty_aktif or amz_aktif:
-        st.session_state['ty_ciro'] = ty_ciro
-        st.session_state['ty_kesinti'] = ty_kesinti
-        st.session_state['ty_hakedis'] = ty_hakedis
-        st.session_state['ty_kar'] = ty_kar
-        st.session_state['ty_iptal_iade'] = ty_iptal_iade
-        
-        st.session_state['amz_ciro'] = amz_ciro
-        st.session_state['amz_kesinti'] = amz_kesinti
-        st.session_state['amz_hakedis'] = amz_hakedis
-        st.session_state['amz_kar'] = amz_kar
-        st.session_state['amz_iptal_iade'] = amz_iptal_iade
-        
-        st.session_state['genel_ciro'] = ty_ciro + amz_ciro
-        st.session_state['genel_kesinti'] = ty_kesinti + amz_kesinti
-        st.session_state['genel_hakedis'] = ty_hakedis + amz_hakedis
-        st.session_state['genel_kar'] = ty_kar + amz_kar
-        st.session_state['genel_iptal_iade'] = ty_iptal_iade + amz_iptal_iade
-        st.session_state['genel_marj'] = (st.session_state['genel_kar'] / st.session_state['genel_ciro'] * 100) if st.session_state['genel_ciro'] > 0 else 0.0
-        
-        frames = []
-        if not df_ty_final.empty: frames.append(df_ty_final)
-        if not df_amz_final.empty: frames.append(df_amz_final)
-        if frames:
-            st.session_state['df_konsolide'] = pd.concat(frames, ignore_index=True)
-            
-        st.session_state['hesaplandi'] = True
-        st.success("✅ Çok kanallı analiz başarıyla tamamlandı!")
-
-# EKRAN ÇİZİM ALANI
-if st.session_state.get('hesaplandi', False):
-    with tab_rapor:
-        st.subheader("👑 Genel Konsolide (Şinter Şirket Toplamı) Durum Masası")
-        g1, g2, g3, g4 = st.columns(4)
-        g1.metric("💰 Toplam Şirket Cirosu", f"₺{st.session_state['genel_ciro']:,.2f}")
-        g2.metric("🟢 Toplam Net Kâr", f"₺{st.session_state['genel_kar']:,.2f}")
-        g3.metric("📈 Genel Net Kâr Marjı", f"%{st.session_state['genel_marj']:.2f}")
-        g4.metric("🚨 Toplam İptal / İade Adedi", f"{int(st.session_state['genel_iptal_iade'])} Adet")
-        
-        st.write("---")
-        st.subheader("📊 Pazaryerlerine Göre Durum Kırılımı")
-        col_ty_pan, col_amz_pan = st.columns(2)
-        
-        with col_ty_pan:
-            st.markdown("### 🧡 Trendyol Performansı")
-            st.write(f"**Net Ciro:** ₺{st.session_state['ty_ciro']:,.2f}")
-            st.write(f"**Trendyol Kesintileri:** ₺{st.session_state['ty_kesinti']:,.2f}")
-            st.write(f"**Hesaba Giren (Hakediş):** ₺{st.session_state['ty_hakedis']:,.2f}")
-            st.write(f"**Trendyol Net Kâr:** ₺{st.session_state['ty_kar']:,.2f}")
-            
-        with col_amz_pan:
-            st.markdown("### 💛 Amazon Performansı")
-            st.write(f"**Net Ciro:** ₺{st.session_state['amz_ciro']:,.2f}")
-            st.write(f"**Amazon Kesintileri:** ₺{st.session_state['amz_kesinti']:,.2f}")
-            st.write(f"**Hesaba Giren (Hakediş):** ₺{st.session_state['amz_hakedis']:,.2f}")
-            st.write(f"**Amazon Net Kâr:** ₺{st.session_state['amz_kar']:,.2f}")
-
-        st.write("---")
-        df_g = pd.DataFrame({
-            "Pazaryeri": ["Trendyol", "Amazon"],
-            "Ciro": [st.session_state['ty_ciro'], st.session_state['amz_ciro']]
-        })
-        st.plotly_chart(px.pie(df_g, values='Ciro', names='Pazaryeri', title="Ciro Dağılımı (%)", hole=0.3), use_container_width=True)
-        
-        if 'df_konsolide' in st.session_state:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                st.session_state['df_konsolide'].to_excel(writer, index=False, sheet_name='Konsolide_Satis_Raporu')
-            st.download_button(label="📥 Tüm Şirket Satışlarını Konsolide Excel Olarak İndir", data=output.getvalue(), file_name="Konsolide_E-Ticaret_Raporu.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                asin = str(row
