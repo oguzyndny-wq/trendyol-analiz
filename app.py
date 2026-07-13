@@ -3,10 +3,20 @@ import pandas as pd
 import plotly.express as px
 import io
 
-st.set_page_config(page_title="E-Ticaret Konsolide Paneli v10.2", layout="wide")
-st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v10.2")
-st.markdown("Hata yakalama blokları ve eksik parantezler tamamen giderilmiştir.")
+st.set_page_config(page_title="E-Ticaret Konsolide Paneli v10.3", layout="wide")
+st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v10.3")
+st.markdown("Tekli/Çoklu yükleme uyumluluğu sağlanmış ve KeyError hatası tamamen giderilmiştir.")
 st.write("---")
+
+# Session State Değişkenlerinin Önceden Güvenli Tanımlanması (KeyError Koruması)
+varsayilanlar = {
+    'ty_ciro': 0.0, 'ty_kesinti': 0.0, 'ty_maliyet': 0.0, 'ty_kar': 0.0, 'ty_sip_adet': 0, 'ty_urun_adet': 0,
+    'amz_ciro': 0.0, 'amz_kesinti': 0.0, 'amz_maliyet': 0.0, 'amz_kar': 0.0, 'amz_sip_adet': 0, 'amz_urun_adet': 0,
+    'genel_ciro': 0.0, 'genel_maliyet': 0.0, 'genel_kar': 0.0, 'genel_sip_adet': 0, 'genel_urun_adet': 0, 'genel_marj': 0.0
+}
+for k, v in varsayilanlar.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 tab_yükleme, tab_rapor = st.tabs(["📥 Veri Yükleme İstasyonu", "📊 Konsolide Finans & Raporlar"])
 
@@ -57,6 +67,8 @@ def clean_amazon_net_kazanc(val):
 if baslat_btn:
     st.session_state['hesaplandi'] = False
     ty_aktif, amz_aktif = False, False
+    
+    # Yerel değişken sıfırlamaları
     ty_ciro, ty_kesinti, ty_maliyet_gideri, ty_kar, ty_sip_adet, ty_urun_adet = 0.0, 0.0, 0.0, 0.0, 0, 0
     amz_ciro, amz_kesinti, amz_maliyet_gideri, amz_kar, amz_sip_adet, amz_urun_adet = 0.0, 0.0, 0.0, 0.0, 0, 0
     
@@ -137,8 +149,46 @@ if baslat_btn:
             amz_aktif = True
         except Exception as e: st.error(f"Amazon Hatası: {str(e)}")
 
-    if ty_aktif or amz_aktif:
-        st.session_state['ty_ciro'], st.session_state['ty_kesinti'], st.session_state['ty_maliyet'], st.session_state['ty_kar'], st.session_state['ty_sip_adet'], st.session_state['ty_urun_adet'] = ty_ciro, ty_kesinti, ty_maliyet_gideri, ty_kar, ty_sip_adet, ty_urun_adet
-        st.session_state['amz_ciro'], st.session_state['amz_kesinti'], st.session_state['amz_maliyet'], st.session_state['amz_kar'], st.session_state['amz_sip_adet'], st.session_state['amz_urun_adet'] = amz_ciro, amz_kesinti, amz_maliyet_gideri, amz_kar, amz_sip_adet, amz_urun_adet
-        st.session_state['genel_ciro'], st.session_state['genel_maliyet'], st.session_state['genel_kar'] = ty_ciro + amz_ciro, ty_maliyet_gideri + amz_maliyet_gideri, ty_kar + amz_kar
-        st.session_state['genel_sip_adet'],
+    # Hesaplanan değerleri session_state üzerine yazma
+    st.session_state['ty_ciro'], st.session_state['ty_kesinti'], st.session_state['ty_maliyet'], st.session_state['ty_kar'], st.session_state['ty_sip_adet'], st.session_state['ty_urun_adet'] = ty_ciro, ty_kesinti, ty_maliyet_gideri, ty_kar, ty_sip_adet, ty_urun_adet
+    st.session_state['amz_ciro'], st.session_state['amz_kesinti'], st.session_state['amz_maliyet'], st.session_state['amz_kar'], st.session_state['amz_sip_adet'], st.session_state['amz_urun_adet'] = amz_ciro, amz_kesinti, amz_maliyet_gideri, amz_kar, amz_sip_adet, amz_urun_adet
+    st.session_state['genel_ciro'], st.session_state['genel_maliyet'], st.session_state['genel_kar'] = ty_ciro + amz_ciro, ty_maliyet_gideri + amz_maliyet_gideri, ty_kar + amz_kar
+    st.session_state['genel_sip_adet'], st.session_state['genel_urun_adet'] = ty_sip_adet + amz_sip_adet, ty_urun_adet + amz_urun_adet
+    st.session_state['genel_marj'] = ((ty_kar + amz_kar) / (ty_ciro + amz_ciro) * 100.0) if (ty_ciro + amz_ciro) > 0 else 0.0
+    st.session_state['hesaplandi'] = True
+
+if st.session_state.get('hesaplandi', False):
+    with tab_rapor:
+        st.subheader("👑 Genel Konsolide (Şirket Toplamı) Durum Masası")
+        g1, g2, g3, g4, g5, g6 = st.columns(6)
+        g1.metric("💰 Toplam Şirket Cirosu", "₺{:,.2f}".format(st.session_state['genel_ciro']))
+        g2.metric("📦 Toplam Ürün Alış Maliyeti", "₺{:,.2f}".format(st.session_state['genel_maliyet']))
+        g3.metric("🟢 Toplam Net Kâr", "₺{:,.2f}".format(st.session_state['genel_kar']))
+        g4.metric("📈 Genel Net Kâr Marjı", "%{:.2f}".format(st.session_state['genel_marj']))
+        g5.metric("📦 Toplam Sipariş Çeşidi", "{:,} Adet".format(st.session_state['genel_sip_adet']))
+        g6.metric("🏷️ Toplam Satılan Ürün", "{:,} Adet".format(st.session_state['genel_urun_adet']))
+        st.write("---")
+        col_ty_pan, col_amz_pan = st.columns(2)
+        with col_ty_pan:
+            st.markdown("### 🧡 Trendyol Performans Raporu")
+            st.write("**Net Ciro:** ₺{:,.2f}".format(st.session_state['ty_ciro']))
+            st.write("**Trendyol Kesintileri:** ₺{:,.2f}".format(st.session_state['ty_kesinti']))
+            st.write("**📦 Ürün Alış Maliyet Gideri:** ₺{:,.2f}".format(st.session_state['ty_maliyet']))
+            st.write("**🟢 Net Kâr:** ₺{:,.2f}".format(st.session_state['ty_kar']))
+            ty_m = (st.session_state['ty_kar'] / st.session_state['ty_ciro'] * 100.0) if st.session_state['ty_ciro'] > 0 else 0.0
+            st.write("**Kanal Marjı:** %{:.2f}".format(ty_m))
+            st.write("**📦 Toplam Sipariş Paket Sayısı:**", int(st.session_state['ty_sip_adet']), "Adet")
+            st.write("**🏷️ Toplam Satılan Ürün Adedi:**", int(st.session_state['ty_urun_adet']), "Adet")
+        with col_amz_pan:
+            st.markdown("### 💛 Amazon Performans Raporu")
+            st.write("**Net Ciro:** ₺{:,.2f}".format(st.session_state['amz_ciro']))
+            st.write("**Amazon Kesintileri:** ₺{:,.2f}".format(st.session_state['amz_kesinti']))
+            st.write("**📦 Ürün Alış Maliyet Gideri:** ₺{:,.2f}".format(st.session_state['amz_maliyet']))
+            st.write("**🟢 Net Kâr:** ₺{:,.2f}".format(st.session_state['amz_kar']))
+            amz_m = (st.session_state['amz_kar'] / st.session_state['amz_ciro'] * 100.0) if st.session_state['amz_ciro'] > 0 else 0.0
+            st.write("**Kanal Marjı:** %{:.2f}".format(amz_m))
+            st.write("**📦 Toplam Ürün Çeşidi (Satır):**", int(st.session_state['amz_sip_adet']), "Adet")
+            st.write("**🏷️ Toplam Satılan Ürün Adedi:**", int(st.session_state['amz_urun_adet']), "Adet")
+        st.write("---")
+        df_g = pd.DataFrame({"Pazaryeri": ["Trendyol", "Amazon"], "Ciro": [st.session_state['ty_ciro'], st.session_state['amz_ciro']]})
+        st.plotly_chart(px.pie(df_g, values='Ciro', names='Pazaryeri', title="Ciro Dağılımı (%)", hole=0.3), use_container_width=True)
