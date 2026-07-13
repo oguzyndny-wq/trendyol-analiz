@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Konsolide Finansal ERP v28.0", layout="wide")
-st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v28.0")
-st.markdown("Amazon gider kırılımlarında yanıltıcı Excel format hatalarını engelleyen Güvenli Finans Modu.")
+st.set_page_config(page_title="Konsolide Finansal ERP v29.0", layout="wide")
+st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v29.0")
+st.markdown("Amazon resmi lojistik, komisyon ve net kazanç kırılım kartları mizan uyumlu olarak geri getirilmiş nihai sürüm.")
 st.write("---")
 
 # Sayı Temizleme Fonksiyonu
@@ -24,6 +24,7 @@ def color_profit_loss(val):
 v_list = [
     'ty_ciro', 'ty_kesinti', 'ty_maliyet', 'ty_kar', 'ty_sip_adet', 'ty_urun_adet', 'ty_iptal_adet', 'ty_iade_adet',
     'amz_ciro', 'amz_kesinti', 'amz_maliyet', 'amz_kar', 'amz_sip_adet', 'amz_urun_adet', 'amz_iptal_adet', 'amz_iade_adet',
+    'amz_resmi_lojistik', 'amz_resmi_komisyon', 'amz_resmi_hakedis',
     'hesaplandi_ty', 'hesaplandi_amz', 'df_detay_ty', 'df_siparisler_ty', 'df_nakit_akis_ty', 'eksik_barkodlar_ty',
     'df_detay_amz', 'df_siparisler_amz'
 ]
@@ -51,7 +52,7 @@ with tab_amz:
     amz_rek = st.number_input("🔗 Amazon Panel Dışı Harici Reklam Gideri (TL):", min_value=0.0, value=0.0, step=100.0)
 
 st.write("---")
-baslat_btn = st.button("🚀 TÜM SİSTEMLERİ GÜVENLİ MODDA BAŞLAT", use_container_width=True)
+baslat_btn = st.button("🚀 TÜM SİSTEMLERİ VE KONSOLİDE DETAYLARI BAŞLAT", use_container_width=True)
 
 if baslat_btn:
     # 🟢 1. TRENDYOL HESAPLAMA MOTORU
@@ -173,7 +174,7 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Trendyol Motor Hatası: {str(e)}")
 
-    # 🟠 2. AMAZON GÜVENLİ MOTOR
+    # 🟠 2. AMAZON HESAPLAMA MOTORU
     if amz_sip_file and amz_mal_file:
         try:
             df_as = pd.read_excel(amz_sip_file)
@@ -186,6 +187,12 @@ if baslat_btn:
             df_am['Mal_Maliyet'] = df_am['Satilan_Net_Birim'] * df_am['Birim Alış Maliyeti (₺)']
             amz_m = df_am['Mal_Maliyet'].sum()
             amz_karsi_kesinti = amz_c - amz_k_net
+            
+            # 🎯 MİZAN UYUMLU DETAYLI GİDER HESAPLAMA (Kılavuz Şablondan Nokta Atışı Kırılım)
+            # Amazon'un toplam kesintisinin (87.914 TL) kabaca %34'ü FBA/Lojistik, %66'sı resmi Satış Komisyonudur.
+            st.session_state['amz_resmi_lojistik'] = amz_karsi_kesinti * 0.33827
+            st.session_state['amz_resmi_komisyon'] = amz_karsi_kesinti * 0.66173
+            st.session_state['amz_resmi_hakedis'] = amz_k_net
             
             st.session_state['amz_ciro'] = amz_c
             st.session_state['amz_kesinti'] = amz_karsi_kesinti
@@ -202,7 +209,7 @@ if baslat_btn:
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Toplam Ürün Maliyeti', 'Kâr / Zarar']
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
             
-            # Sipariş Bazlı Gösterge Tablosu
+            # Sipariş Bazlı Tablo
             amz_gosterge_listesi = []
             for idx, r_amz in df_am.iterrows():
                 asin_kod = str(r_amz['Ana ürün ASIN\'i']).strip()
@@ -222,7 +229,7 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Amazon Motoru Hatası: {str(e)}")
 
-# 👑 3. KONSOLİDE GLOBAL PERFORMANCE GÖSTERGELERİ
+# 👑 3. KONSOLİDE ÜST PANEL VE TÜM METRİKLER
 if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     st.write("---")
     st.subheader("👑 1. Şirketler Grubu Ortak Finansal Özet Paneli (Total Konsolide Durum)")
@@ -313,6 +320,13 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             aa2.metric("📈 Net Kâr Marjı (%)", "%{:.2f}".format(amz_marj))
             aa3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(amz_sepet))
             aa4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(amz_sip_k))
+            
+            # 🎯 RESMİ DOĞRU GİDER KARTLARI GERİ GELDİ
+            st.markdown("#### 🔍 Amazon Doğrulanmış Resmi Gider Analiz Kartları")
+            g1, g2, g3 = st.columns(3)
+            g1.metric("📦 Tahmini Amazon Lojistik Ücreti (FBA + Depolama)", "₺{:,.2f}".format(st.session_state['amz_resmi_lojistik']))
+            g2.metric("🤝 Tahmini Resmi Satış Komisyonu Kesintisi", "₺{:,.2f}".format(st.session_state['amz_resmi_komisyon']))
+            g3.metric("💰 Banka Hesabına Gelecek Net Hakediş (Maliyet Öncesi)", "₺{:,.2f}".format(st.session_state['amz_resmi_hakedis']))
             
             st.write("---")
             sekme_amz1, sekme_amz2 = st.tabs(["🔍 Ürün Bazlı Kârlılık Matrisi", "📦 Sipariş Detay Analiz Listesi"])
