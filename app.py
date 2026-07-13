@@ -37,4 +37,115 @@ with tab_yükleme:
 
 def clean_number(val):
     if pd.isnull(val): return 0.0
-    if isinstance(
+    if isinstance(val, (int, float)): return float(val)
+    if hasattr(val, 'strftime'): return 0.0
+    val_str = str(val).strip()
+    if '-' in val_str and len(val_str) > 7:
+        p = val_str.split('-')
+        try: return float(p[0]) + float(p[1])/100.0
+        except: return 0.0
+    try:
+        if ',' in val_str and '.' in val_str:
+            if val_str.rfind(',') > val_str.rfind('.'): val_str = val_str.replace('.', '').replace(',', '.')
+            else: val_str = val_str.replace(',', '')
+        else: val_str = val_str.replace(',', '.')
+        if val_str.count('.') > 1:
+            p = val_str.split('.')
+            val_str = "".join(p[:-1]) + "." + p[-1]
+        return float(val_str)
+    except: return 0.0
+
+def clean_amazon_net_kazanc(val):
+    if pd.isnull(val): return 0.0
+    val_str = str(val).strip()
+    if '-' in val_str and len(val_str) > 7: return 0.0
+    try:
+        num = float(val_str.replace(',', '.'))
+        return num / 10000.0 if ('.' not in val_str and abs(num) > 100000) else num
+    except: return 0.0
+
+if baslat_btn:
+    st.session_state['hesaplandi'] = False
+    ty_aktif, amz_aktif = False, False
+    ty_ciro, ty_kesinti, ty_maliyet_gideri, ty_kar, ty_sip_adet, ty_urun_adet = 0.0, 0.0, 0.0, 0.0, 0, 0
+    amz_ciro, amz_kesinti, amz_maliyet_gideri, amz_kar, amz_sip_adet, amz_urun_adet = 0.0, 0.0, 0.0, 0.0, 0, 0
+    
+    # 🧡 TRENDYOL MOTORU
+    if finans_file and prod_file and maliyet_file:
+        try:
+            df_finans = pd.read_excel(finans_file)
+            df_prod = pd.read_excel(prod_file, skiprows=1)
+            df_maliyet = pd.read_excel(maliyet_file)
+            df_maliyet.columns = [c.strip() for c in df_maliyet.columns]
+            df_finans.columns = [c.strip() for c in df_finans.columns]
+            df_prod.columns = [c.strip() for c in df_prod.columns]
+            ty_sip_adet = int(df_prod['Sipariş Numarası'].nunique())
+            
+            finans_dict = {}
+            for idx, row in df_finans.iterrows():
+                s_no = str(row['Sipariş No']).strip()
+                finans_dict[s_no] = {
+                    't_adet': clean_number(row['Ürün Adedi']),
+                    'kom': clean_number(row['Komisyon/Yurt Dışı Stok Destek Bedeli']),
+                    'kar': clean_number(row['Gönderi Kargo Bedeli']),
+                    'hiz': clean_number(row['Platform Hizmet Bedeli'])
+                }
+            maliyet_dict = dict(zip(df_maliyet['TRENDYOL BARKOD'].astype(str).str.strip(), df_maliyet['TOPLAM MALİYET']))
+            ty_sonuc = []
+            for idx, row in df_prod.iterrows():
+                barkod = str(row['Barkod']).strip()
+                siparis_no = str(row['Sipariş Numarası']).strip()
+                statü = str(row.get('Statü', row.get('Sipariş Durumu', ''))).strip().lower()
+                adet = clean_number(row['Adet'])
+                satis_tutari = clean_number(row['Satış Tutarı'])
+                if barkod == 'nan' or siparis_no == 'nan': continue
+                if "iptal" in statü or "reddedildi" in statü: continue
+                ty_urun_adet += int(adet)
+                birim_maliyet = clean_number(maliyet_dict.get(barkod, 0.0))
+                toplam_maliyet = birim_maliyet * adet
+                is_iade = "iade" in statü
+                h_ciro = 0.0 if is_iade else satis_tutari
+                h_maliyet = 0.0 if is_iade else toplam_maliyet
+                
+                # Kırılmaya karşı tek satıra indirgenmiş Trendyol finans eşleştirmesi
+                f = finans_dict.get(siparis_no, {'t_adet': 0, 'kom': 0, 'kar': 0, 'hiz': 0})
+                div = f['t_adet'] if f['t_adet'] > 0 else 1
+                b_kom = f['kom'] / div * adet if f['t_adet'] > 0 else 0
+                b_kar = f['kar'] / div * adet if f['t_adet'] > 0 else 0
+                b_hiz = f['hiz'] / div * adet if f['t_adet'] > 0 else 0
+                
+                net_kar = h_ciro + b_kom + b_kar + b_hiz - h_maliyet
+                ty_sonuc.append({"Ciro": h_ciro, "Kesinti": b_kom + b_kar + b_hiz, "Maliyet": h_maliyet, "Net Kâr": net_kar})
+            df_ty = pd.DataFrame(ty_sonuc)
+            ty_ciro, ty_kesinti, ty_maliyet_gideri = df_ty['Ciro'].sum(), abs(df_ty['Kesinti'].sum()), df_ty['Maliyet'].sum()
+            ty_kar = df_ty['Net Kâr'].sum() - ty_reklam
+            ty_aktif = True
+        except Exception as e: st.error(f"Trendyol Hatası: {str(e)}")
+
+    # 💛 AMAZON MOTORU
+    if amazon_file and amazon_maliyet_file:
+        try:
+            df_amz_sales = pd.read_csv(amazon_file) if hasattr(amazon_file, 'name') and amazon_file.name.endswith('.csv') else pd.read_excel(amazon_file)
+            df_amz_cost = pd.read_csv(amazon_maliyet_file) if hasattr(amazon_maliyet_file, 'name') and amazon_maliyet_file.name.endswith('.csv') else pd.read_excel(amazon_maliyet_file)
+            df_amz_sales.columns = [c.strip() for c in df_amz_sales.columns]
+            df_amz_cost.columns = [c.strip() for c in df_amz_cost.columns]
+            asin_col = 'Ana ürün ASIN\'i' if 'Ana ürün ASIN\'i' in df_amz_cost.columns else df_amz_cost.columns[0]
+            cost_col = 'Birim Alış Maliyeti (₺)' if 'Birim Alış Maliyeti (₺)' in df_amz_cost.columns else df_amz_cost.columns[-2]
+            amz_cost_dict = dict(zip(df_amz_cost[asin_col].astype(str).str.strip(), df_amz_cost[cost_col]))
+            amz_sip_adet = int(len(df_amz_sales))
+            amz_sonuc = []
+            for idx, row in df_amz_sales.iterrows():
+                asin = str(row.get('Ana ürün ASIN\'i', '')).strip()
+                net_birim = clean_number(row.get('Satılan net birim sayısı', 0))
+                s_tutari = clean_number(row.get('Satış', 0.0))
+                n_kazanc = clean_amazon_net_kazanc(row.get('Toplam Net kazanç', 0.0))
+                amz_urun_adet += int(max(0.0, net_birim))
+                b_maliyet = clean_number(amz_cost_dict.get(asin, 0.0))
+                amz_sonuc.append({"Ciro": s_tutari, "Kesinti": s_tutari - n_kazanc, "Maliyet": b_maliyet * max(0.0, net_birim), "Net Kâr": n_kazanc - (b_maliyet * max(0.0, net_birim))})
+            df_amz = pd.DataFrame(amz_sonuc)
+            amz_ciro, amz_maliyet_gideri, amz_kar = df_amz['Ciro'].sum(), df_amz['Maliyet'].sum(), df_amz['Net Kâr'].sum()
+            amz_kesinti = amz_ciro - (amz_kar + amz_maliyet_gideri)
+            amz_aktif = True
+        except Exception as e: st.error(f"Amazon Hatası: {str(e)}")
+
+    # Hafızaya Sev
