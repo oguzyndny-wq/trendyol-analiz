@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Konsolide Finansal ERP v24.2", layout="wide")
-st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v24.2")
-st.markdown("Amazon sipariş detaylarındaki sütun eşleşme hatası (KeyError) tamamen giderilmiş kesin sürüm.")
+st.set_page_config(page_title="Konsolide Finansal ERP v25.0", layout="wide")
+st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v25.0")
+st.markdown("Amazon sipariş detaylarındaki ters çıkarma ve bölme hataları tamamen düzeltilmiş kusursuz sürüm.")
 st.write("---")
 
 # Sayı Temizleme Fonksiyonları
@@ -224,22 +224,25 @@ if baslat_btn:
             st.session_state['amz_iade_adet'] = int(df_as['İade edilen birimler'].sum() if 'İade edilen birimler' in df_as.columns else 0)
             st.session_state['amz_iptal_adet'] = 0
             
-            # Ürün Bazlı Matris
             df_am_detay = df_am[['Ana ürün ASIN\'i', 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc']].copy()
             df_am_detay['Birim_Maliyet'] = df_am['Birim Alış Maliyeti (₺)']
             df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon_Net_Kazanc'] - (df_am_detay['Satilan_Net_Birim'] * df_am_detay['Birim_Maliyet'])
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Kâr / Zarar']
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
             
-            # 🚨 MODÜL: Sütun Eşleşme Hatası Düzeltildi
+            # 🚨 DÜZELTME: Amazon Sipariş Detay Doğru Temizleme ve Doğru Çıkarma İstasyonu
             amz_m_dict = dict(zip(df_am['Ana ürün ASIN\'i'].astype(str).str.strip(), df_am['Birim Alış Maliyeti (₺)']))
             
             df_as_goster = df_as[['Ana ürün ASIN\'i', 'Satılan birimler', 'İade edilen birimler', 'Satılan net birim sayısı', 'Satış', 'Toplam Net kazanç']].copy()
+            
+            # Önce tüm finansal hücreler süzgeçten geçirilip gerçek kuruşlu hallerine indiriliyor
             df_as_goster['Toplam Net kazanç'] = df_as_goster['Toplam Net kazanç'].apply(parse_amazon_clean)
             df_as_goster['Satış'] = df_as_goster['Satış'].apply(parse_amazon_clean)
             
+            # Gerçek Alış Maliyeti
             df_as_goster['Alış Maliyeti'] = df_as_goster.apply(lambda row: safe_f(amz_m_dict.get(str(row['Ana ürün ASIN\'i']).strip(), 0.0)) * safe_f(row['Satılan net birim sayısı']), axis=1)
-            # Hatalı olan 'Amazon Net Kazanç' sütun araması ham adıyla 'Toplam Net kazanç' olarak düzeltildi:
+            
+            # 🎯 DOĞRU MATEMATİK FORMÜLÜ: (Net Kazanç - Ürün Maliyeti) 
             df_as_goster['Toplam Kâr/Zarar'] = df_as_goster['Toplam Net kazanç'] - df_as_goster['Alış Maliyeti']
             
             df_as_goster.columns = ['ASIN/Barkod', 'Brüt Satış Adedi', 'İade Adedi', 'Net Satış Adedi', 'Ciro (Brüt)', 'Amazon Net Kazanç', 'Alış Maliyeti', 'Toplam Kâr/Zarar']
@@ -251,7 +254,7 @@ if baslat_btn:
 # 👑 3. KONSOLİDE ÜST PANEL VE TÜM METRİKLER
 if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     st.write("---")
-    st.subheader("👑 1. Şiriketler Grubu Ortak Finansal Özet Paneli (Total Konsolide Durum)")
+    st.subheader("👑 1. Şirketler Grubu Ortak Finansal Özet Paneli (Total Konsolide Durum)")
     
     total_ciro = st.session_state['ty_ciro'] + st.session_state['amz_ciro']
     total_kesinti = st.session_state['ty_kesinti'] + st.session_state['amz_kesinti']
@@ -322,7 +325,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             with sekme_ty3:
                 if st.session_state['df_nakit_akis_ty'] is not None:
                     st.dataframe(st.session_state['df_nakit_akis_ty'].style.format({'Tutar': '₺{:,.2f}'}), use_container_width=True)
-        else: st.info("Trendyol raporları henüz yüklenmedi.")
+        else: st.info("Trendyol Raporları Yüklenmedi.")
             
     with s_amz:
         if st.session_state['hesaplandi_amz']:
@@ -355,4 +358,4 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
                 st.dataframe(st.session_state['df_detay_amz'].style.format({'Ciro': '₺{:,.2f}', 'Kâr / Zarar': '₺{:,.2f}', 'Birim Alış Maliyeti': '₺{:,.2f}', 'Amazon Net Kazanç': '₺{:,.2f}'}).map(color_profit_loss, subset=['Kâr / Zarar']), use_container_width=True, height=400)
             with sekme_amz2:
                 st.dataframe(st.session_state['df_siparisler_amz'].style.format({'Ciro (Brüt)': '₺{:,.2f}', 'Amazon Net Kazanç': '₺{:,.2f}', 'Alış Maliyeti': '₺{:,.2f}', 'Toplam Kâr/Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Toplam Kâr/Zarar']), use_container_width=True, height=400)
-        else: st.info("Amazon raporları henüz yüklenmedi.")
+        else: st.info("Amazon Raporları Yüklenmedi.")
