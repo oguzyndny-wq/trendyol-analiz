@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Konsolide Finansal ERP v27.0", layout="wide")
-st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v27.0")
-st.markdown("Amazon kargo, FBA lojistik, depolama ve komisyon giderlerinin tüm finansal kırılımlarını gösteren üst düzey sürüm.")
+st.set_page_config(page_title="Konsolide Finansal ERP v28.0", layout="wide")
+st.title("👑 Trendyol & Amazon Kusursuz Konsolide ERP ve İş Zekası Paneli v28.0")
+st.markdown("Amazon gider kırılımlarında yanıltıcı Excel format hatalarını engelleyen Güvenli Finans Modu.")
 st.write("---")
 
 # Sayı Temizleme Fonksiyonu
@@ -13,20 +13,6 @@ def safe_f(v):
     if isinstance(v, (int, float)): return float(v)
     try: return float(str(v).strip().replace('.', '').replace(',', '.'))
     except: return 0.0
-
-def parse_amazon_clean(val, force_int=False):
-    if pd.isnull(val): return 0.0
-    s = str(val).strip().replace(' ', '')
-    if '-' in s and ':' in s:
-        try: return float(s.split('-')[0][:4])
-        except: return 0.0
-    try:
-        num = float(s.replace(',', '.'))
-        if not force_int and abs(num) > 100000:
-            return num / 10000.0
-        return num
-    except:
-        return 0.0
 
 def color_profit_loss(val):
     if isinstance(val, (int,float)):
@@ -38,9 +24,8 @@ def color_profit_loss(val):
 v_list = [
     'ty_ciro', 'ty_kesinti', 'ty_maliyet', 'ty_kar', 'ty_sip_adet', 'ty_urun_adet', 'ty_iptal_adet', 'ty_iade_adet',
     'amz_ciro', 'amz_kesinti', 'amz_maliyet', 'amz_kar', 'amz_sip_adet', 'amz_urun_adet', 'amz_iptal_adet', 'amz_iade_adet',
-    'amz_tot_lojistik', 'amz_tot_depolama', 'amz_tot_tasimacilik', 'amz_tot_komisyon', 'amz_tot_reklam_panel', 'amz_tot_iade_komisyon',
-    'hesaplandi_ty', 'hesaplandi_amz', 'df_detay_ty', 'df_siparisler_ty', 'df_nakit_akis_ty', 'eksik_barkodlar_ty', 'df_olu_urunler_ty',
-    'df_detay_amz', 'df_siparisler_amz', 'eksik_barkodlar_amz', 'df_olu_urunler_amz'
+    'hesaplandi_ty', 'hesaplandi_amz', 'df_detay_ty', 'df_siparisler_ty', 'df_nakit_akis_ty', 'eksik_barkodlar_ty',
+    'df_detay_amz', 'df_siparisler_amz'
 ]
 for k in v_list:
     if k not in st.session_state:
@@ -66,7 +51,7 @@ with tab_amz:
     amz_rek = st.number_input("🔗 Amazon Panel Dışı Harici Reklam Gideri (TL):", min_value=0.0, value=0.0, step=100.0)
 
 st.write("---")
-baslat_btn = st.button("🚀 TÜM SİSTEMLERİ VE GONSOLİDE GİDER KIRILIMLARINI BAŞLAT", use_container_width=True)
+baslat_btn = st.button("🚀 TÜM SİSTEMLERİ GÜVENLİ MODDA BAŞLAT", use_container_width=True)
 
 if baslat_btn:
     # 🟢 1. TRENDYOL HESAPLAMA MOTORU
@@ -188,7 +173,7 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Trendyol Motor Hatası: {str(e)}")
 
-    # 🟠 2. AMAZON DETAYLI GİDER PARSER MOTORU
+    # 🟠 2. AMAZON GÜVENLİ MOTOR
     if amz_sip_file and amz_mal_file:
         try:
             df_as = pd.read_excel(amz_sip_file)
@@ -196,22 +181,12 @@ if baslat_btn:
             df_as.columns = [c.strip() for c in df_as.columns]
             df_am.columns = [c.strip() for c in df_am.columns]
             
-            # Ana Mizan Verileri
             amz_c = df_am['Brut_Satis'].sum()
             amz_k_net = df_am['Amazon_Net_Kazanc'].sum()
             df_am['Mal_Maliyet'] = df_am['Satilan_Net_Birim'] * df_am['Birim Alış Maliyeti (₺)']
             amz_m = df_am['Mal_Maliyet'].sum()
             amz_karsi_kesinti = amz_c - amz_k_net
             
-            # 🔍 SİLBAŞTAN GİDER PARSERİ: Sipariş dosyasından detay lojistik ve komisyonları ayıklıyoruz
-            st.session_state['amz_tot_lojistik'] = df_as['Toplam Amazon Lojistik ücretleri'].apply(parse_amazon_clean).sum() if 'Toplam Amazon Lojistik ücretleri' in df_as.columns else 0.0
-            st.session_state['amz_tot_depolama'] = df_as['Toplam Aylık envanter depolama ücreti'].apply(parse_amazon_clean).sum() if 'Toplam Aylık envanter depolama ücreti' in df_as.columns else 0.0
-            st.session_state['amz_tot_tasimacilik'] = df_as['Toplam Gelen kargo taşımacılık ücreti'].apply(parse_amazon_clean).sum() if 'Toplam Gelen kargo taşımacılık ücreti' in df_as.columns else 0.0
-            st.session_state['amz_tot_komisyon'] = df_as['Toplam Satış komisyonu'].apply(parse_amazon_clean).sum() if 'Toplam Satış komisyonu' in df_as.columns else 0.0
-            st.session_state['amz_tot_reklam_panel'] = df_as['Toplam Sponsored Products ücreti'].apply(parse_amazon_clean).sum() if 'Toplam Sponsored Products ücreti' in df_as.columns else 0.0
-            st.session_state['amz_tot_iade_komisyon'] = df_as['Toplam Satış Komisyonu Para İadeleri'].apply(parse_amazon_clean).sum() if 'Toplam Satış Komisyonu Para İadeleri' in df_as.columns else 0.0
-            
-            # Toplam saf kâr hesabından harici reklamı düşüyoruz
             st.session_state['amz_ciro'] = amz_c
             st.session_state['amz_kesinti'] = amz_karsi_kesinti
             st.session_state['amz_maliyet'] = amz_m
@@ -227,8 +202,7 @@ if baslat_btn:
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Toplam Ürün Maliyeti', 'Kâr / Zarar']
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
             
-            # Sipariş Bazlı Tablo
-            amz_m_dict = dict(zip(df_am['Ana ürün ASIN\'i'].astype(str).str.strip(), df_am['Birim Alış Maliyeti (₺)']))
+            # Sipariş Bazlı Gösterge Tablosu
             amz_gosterge_listesi = []
             for idx, r_amz in df_am.iterrows():
                 asin_kod = str(r_amz['Ana ürün ASIN\'i']).strip()
@@ -258,7 +232,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     total_maliyet = st.session_state['ty_maliyet'] + st.session_state['amz_maliyet']
     total_kar = st.session_state['ty_kar'] + st.session_state['amz_kar']
     total_sip = st.session_state['ty_sip_adet'] + st.session_state['amz_sip_adet']
-    total_reklam = ty_rek + amz_rek + st.session_state['amz_tot_reklam_panel']
+    total_reklam = ty_rek + amz_rek
     
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("💰 Toplam Ortak Net Ciro", "₺{:,.2f}".format(total_ciro))
@@ -329,7 +303,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             
             a1, a2, a3, a4 = st.columns(4)
             a1.metric("Amazon Net Ciro", "₺{:,.2f}".format(st.session_state['amz_ciro']))
-            a2.metric("Amazon Toplam Kesinti", "₺{:,.2f}".format(st.session_state['amz_kesinti']))
+            a2.metric("Amazon Toplam Kesinti (Mizan)", "₺{:,.2f}".format(st.session_state['amz_kesinti']))
             a3.metric("Amazon Net Kâr", "₺{:,.2f}".format(st.session_state['amz_kar']))
             a4.metric("🚫 İptal / 🔄 İade", f"{st.session_state['amz_iptal_adet']} / {st.session_state['amz_iade_adet']} Adet")
             
@@ -339,19 +313,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             aa2.metric("📈 Net Kâr Marjı (%)", "%{:.2f}".format(amz_marj))
             aa3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(amz_sepet))
             aa4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(amz_sip_k))
-            
-            # 🎯 YENİ: AMAZON DETAYLI GİDER LOGU VE RESMİ KIRILIM KARTLARI
-            st.markdown("#### 🔍 Amazon Resmi Gider ve Lojistik Kırılımları")
-            g1, g2, g3 = st.columns(3)
-            g1.metric("📦 Toplam Lojistik Ücreti (FBA)", "₺{:,.2f}".format(st.session_state['amz_tot_lojistik']))
-            g2.metric("🏪 Aylık Depolama Ücreti", "₺{:,.2f}".format(st.session_state['amz_tot_depolama']))
-            g3.metric("🚛 Gelen Kargo / Taşımacılık Ücreti", "₺{:,.2f}".format(st.session_state['amz_tot_tasimacilik']))
-            
-            st.write(" ")
-            g4, g5, g6 = st.columns(3)
-            g4.metric("🤝 Toplam Satış Komisyonu Kesintisi", "₺{:,.2f}".format(st.session_state['amz_tot_komisyon']))
-            g5.metric("📢 Sponsored Products (Panel Reklam Gideri)", "₺{:,.2f}".format(st.session_state['amz_tot_reklam_panel']))
-            g6.metric("🔄 İade Komisyon Geri Ödemeleri (Artı Gelir)", "₺{:,.2f}".format(st.session_state['amz_tot_iade_komisyon']))
             
             st.write("---")
             sekme_amz1, sekme_amz2 = st.tabs(["🔍 Ürün Bazlı Kârlılık Matrisi", "📦 Sipariş Detay Analiz Listesi"])
