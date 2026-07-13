@@ -4,9 +4,9 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.5", layout="wide")
+st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.6", layout="wide")
 
-st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.5 (Sorunsuz Tekli Barkod)")
+st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.6 (Sorunsuz Tekli Barkod)")
 st.markdown("Fiyat tavsiyeleri, reklam motoru ve tekli barkod yazdırma istasyonu entegre edilmiştir.")
 st.write("---")
 
@@ -182,7 +182,6 @@ if 'df_sonuc' in st.session_state:
             urun_bilgi = df_filtre.iloc[0]
             st.write("### 🖨️ Yazıcı Çıktı Önizlemesi")
             
-            # HTML Tasarımını Güvenli Bir Şekilde f-string Formatına Aldık
             etiket_html = f"""
             <div style="border: 3px solid black; padding: 20px; width: 350px; background-color: white; color: black; font-family: Arial; border-radius: 5px;">
                 <h2 style="margin: 0; padding-bottom: 5px; border-bottom: 2px solid black;">{str(urun_bilgi['Marka']).upper()}</h2>
@@ -190,12 +189,4 @@ if 'df_sonuc' in st.session_state:
                 <div style="background-color: black; color: white; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin-top: 20px;">
                     |||| {str(aranan_barkod)} ||||
                 </div>
-                <p style="text-align: center; font-size: 12px; margin: 5px 0 0 0;">Barkod No: {str(aranan_barkod)}</p>
-            </div>
-            """
-            st.markdown(etiket_html, unsafe_allow_html=True)
-            st.info("💡 Bu tekli barkodu yazdırmak için bilgisayarınızdan **CTRL + P** tuşlarına basın. Yazıcı ayarlarından 'Yalnızca Seçimi Yazdır'ı seçerek doğrudan termal etiket çıkartabilirsiniz!")
-
-    # 💡 YAPAY ZEKA ZAM TAVSİYELERI
-    st.write("---")
-    st.subheader("💡 Yapay Zeka Akıllı Fiyatland
+                <p style="text-align
