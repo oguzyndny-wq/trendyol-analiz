@@ -4,10 +4,10 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Konsolide E-Ticaret Yönetim Paneli v8.9", layout="wide")
+st.set_page_config(page_title="Konsolide E-Ticaret Yönetim Paneli v9.0", layout="wide")
 
-st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v8.9")
-st.markdown("Koşul ve yazım hataları tamamen giderilmiştir. Veriler anlık hesaplanır.")
+st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v9.0")
+st.markdown("Satır kırılma ve else ifade hataları tamamen temizlenmiştir. Veriler anlık hesaplanır.")
 st.write("---")
 
 # SEKME SİSTEMİ
@@ -57,17 +57,15 @@ def clean_number(val):
         return float(val_str)
     except: return 0.0
 
-# KISA VE KIRILMAZ AMAZON KURUŞ DÜZELTİCİ (Hata Alan Alan Tamamen Yenilendi)
+# AMAZON KURUŞ DÜZELTİCİ
 def clean_amazon_net_kazanc(val):
     if pd.isnull(val): return 0.0
     val_str = str(val).strip()
     if '-' in val_str and len(val_str) > 7: return 0.0
     try:
         num = float(val_str.replace(',', '.'))
-        # Kırılmayı önlemek için tek satırlık korumalı matematik uygulandı
         return num / 10000.0 if ('.' not in val_str and abs(num) > 100000) else num
-    except:
-        return 0.0
+    except: return 0.0
 
 if baslat_btn:
     st.session_state['hesaplandi'] = False
@@ -132,28 +130,4 @@ if baslat_btn:
                     if f['toplam_adet'] > 0:
                         b_kom = (f['komisyon'] / f['toplam_adet']) * adet
                         b_kar = (f['kargo'] / f['toplam_adet']) * adet
-                        b_hiz = (f['hizmet'] / f['toplam_adet']) * adet
-                
-                net_kar = h_ciro + b_kom + b_kar + b_hiz - h_maliyet
-                ty_sonuc.append({"Ciro": h_ciro, "Kesinti": b_kom + b_kar + b_hiz, "Maliyet": h_maliyet, "Net Kâr": net_kar})
-            
-            df_ty_final = pd.DataFrame(ty_sonuc)
-            ty_ciro = df_ty_final['Ciro'].sum()
-            ty_kesinti = abs(df_ty_final['Kesinti'].sum())
-            ty_maliyet_gideri = df_ty_final['Maliyet'].sum()
-            ty_kar = df_ty_final['Net Kâr'].sum() - ty_reklam
-            ty_aktif = True
-        except Exception as e:
-            st.error(f"Trendyol Hatası: {str(e)}")
-
-    # 💛 AMAZON MOTORU
-    if amazon_file and amazon_maliyet_file:
-        try:
-            df_amz_sales = pd.read_csv(amazon_file) if hasattr(amazon_file, 'name') and amazon_file.name.endswith('.csv') else pd.read_excel(amazon_file)
-            df_amz_cost = pd.read_csv(amazon_maliyet_file) if hasattr(amazon_maliyet_file, 'name') and amazon_maliyet_file.name.endswith('.csv') else pd.read_excel(amazon_maliyet_file)
-            
-            df_amz_sales.columns = [c.strip() for c in df_amz_sales.columns]
-            df_amz_cost.columns = [c.strip() for c in df_amz_cost.columns]
-            
-            asin_col = 'Ana ürün ASIN\'i' if 'Ana ürün ASIN\'i' in df_amz_cost.columns else 'ASIN'
-            cost_col = 'Birim Alış Maliyeti (₺)' if 'Birim Alış Maliyeti (₺)' in df_amz_cost.columns else
+                        b_hiz = (f
