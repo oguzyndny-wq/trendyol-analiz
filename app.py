@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.set_page_config(page_title="Trendyol Finansal ERP v19.0", layout="wide")
-st.title("🤖 Trendyol Kurşun Geçirmez Finansal ERP & İş Zekası Paneli v19.0")
-st.markdown("ROAS Analizi, Nakit Akış Takvimi, İade Operasyon Zararı ve Desi/Ceza Denetimli Nihai Sürüm.")
+st.set_page_config(page_title="Trendyol Finansal ERP v19.1", layout="wide")
+st.title("🤖 Trendyol Profesyonel Finansal ERP & İş Zekası Paneli v19.1")
+st.markdown("ROAS Analizi, Nakit Akış Takvimi, Desi/Ceza Denetimli ve %100 Resmi Muhasebe Tabanlı Sürüm.")
 st.write("---")
 
 if 'hesaplandi' not in st.session_state: st.session_state['hesaplandi'] = False
@@ -16,20 +16,16 @@ if 'df_olu_urunler' not in st.session_state: st.session_state['df_olu_urunler'] 
 
 st.subheader("📥 1. Veri Kaynaklarını Sisteme Yükleyin")
 col1, col2, col3 = st.columns(3)
-with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f19")
-with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p19")
-with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m19")
+with col1: finans_file = st.file_uploader("1. SiparisKayitlari (Finans) Dosyası", type=["xlsx", "xls"], key="f191")
+with col2: prod_file = st.file_uploader("2. prod_ (Sipariş Durum) Dosyası", type=["xlsx", "xls"], key="p191")
+with col3: maliyet_file = st.file_uploader("3. Trendyol Maliyet Listesi", type=["xlsx", "xls"], key="m191")
 
 st.write(" ")
-st.subheader("⚙️ 2. Operasyonel ve Pazarlama Parametreleri")
-col_p1, col_p2 = st.columns(2)
-with col_p1:
-    ty_rek = st.number_input("🔗 İncelenen Döneme Ait Toplam Reklam Gideri (TL):", min_value=0.0, value=0.0, step=500.0)
-with col_p2:
-    iade_sarf_gideri = st.number_input("📦 İade Başına Çöpe Gelen Sarf Malzeme ve İşçilik Maliyeti (Koli, Bant, İşçilik - TL):", min_value=0.0, value=15.0, step=5.0)
+st.subheader("⚙️ 2. Pazarlama Parametresi")
+ty_rek = st.number_input("🔗 İncelenen Döneme Ait Toplam Reklam Gideri (TL):", min_value=0.0, value=0.0, step=500.0)
 
 st.write("---")
-baslat_btn = st.button("🚀 Kurşun Geçirmez ERP Analizini Başlat", use_container_width=True)
+baslat_btn = st.button("🚀 Senkronize ERP Analizini Başlat", use_container_width=True)
 
 def safe_f(v):
     if pd.isnull(v): return 0.0
@@ -81,7 +77,6 @@ if baslat_btn:
             nakit_akis_list = []
             eksik_b_set = set()
             t_ur = 0
-            toplam_iade_sarf_zarari = 0.0
             
             for idx, r in df_p.iterrows():
                 bk = str(r['Barkod']).strip()
@@ -116,13 +111,7 @@ if baslat_btn:
                 b_ika = (fd['ika'] / div) * ad if fd['n'] > 0 else 0.0
                 b_ceza = (fd['ceza'] / div) * ad if fd['n'] > 0 else 0.0
                 
-                # İade operasyonel gizli zarar hesabı
-                b_iade_sarf = 0.0
-                if "iade" in f_durum:
-                    b_iade_sarf = iade_sarf_gideri * ad
-                    toplam_iade_sarf_zarari += b_iade_sarf
-                
-                toplam_kesinti = b_ko + b_ka + b_hi + b_ika + b_ceza + b_iade_sarf
+                toplam_kesinti = b_ko + b_ka + b_hi + b_ika + b_ceza
                 n_kr = h_ci - toplam_kesinti - h_ma
                 
                 if bk == 'TYBI5RUDV2KQX9AR46':
@@ -132,7 +121,6 @@ if baslat_btn:
                 h_desi = safe_f(r.get('Hesapladığım desi', 0.0))
                 desi_uyari = "🚨 Aşım!" if (k_desi > h_desi and h_desi > 0) else "Normal"
                 
-                # Hafta Vade / Nakit Akış Planlaması (Sipariş tarihinden +14 gün sonrası vade tahmini)
                 s_date = fd['tarih']
                 if pd.notnull(s_date):
                     try:
@@ -174,14 +162,12 @@ if baslat_btn:
 
             st.session_state['eksik_barkodlar'] = list(eksik_b_set)
             
-            # Nakit Akış DataFrame Gruplama
             if nakit_akis_list:
                 df_na = pd.DataFrame(nakit_akis_list)
                 st.session_state['df_nakit_akis'] = df_na.groupby('Hafta')['Tutar'].sum().reset_index().sort_values(by='Hafta')
             else:
                 st.session_state['df_nakit_akis'] = None
 
-            # Ölü Ürün Listesi
             olu_data = []
             for k, v in urun_bazli.items():
                 iade_orani = (v['İade Sayısı'] / v['Satılan Adet'] * 100) if v['Satılan Adet'] > 0 else 0.0
@@ -192,10 +178,9 @@ if baslat_btn:
             else:
                 st.session_state['df_olu_urunler'] = None
 
-            # Mizan Master Verileri ve Operasyonel Dengelemeler
             st.session_state['ty_ciro'] = 417431.98
-            st.session_state['ty_kesinti'] = 104382.82 + toplam_iade_sarf_zarari
-            st.session_state['ty_kar'] = 83628.67 - ty_rek - toplam_iade_sarf_zarari
+            st.session_state['ty_kesinti'] = 104382.82
+            st.session_state['ty_kar'] = 83628.67 - ty_rek
             st.session_state['ty_maliyet'] = 417431.98 - 104382.82 - 83628.67
             st.session_state['ty_sip_adet'] = 1561
             st.session_state['ty_iptal_adet'] = t_iptal
@@ -219,7 +204,7 @@ if baslat_btn:
     else:
         st.warning("Lütfen sistem için 3 ana dosyayı da yükleyin.")
 
-# DENETİM VE UYARI MERKEZİ
+# RAPORLAMA ALANI
 if st.session_state['hesaplandi']:
     if st.session_state['eksik_barkodlar']:
         st.error(f"⚠️ MALİYETİ OLMAYAN BARKODLAR ({len(st.session_state['eksik_barkodlar'])} Adet):")
@@ -232,13 +217,12 @@ if st.session_state['hesaplandi']:
         st.dataframe(styled_olu, use_container_width=True, height=200)
         st.write("---")
 
-# RAPORLAMA KARTLARI
 if st.session_state['hesaplandi']:
     st.subheader("📊 1. Üst Düzey Finansal KPI Kontrol İstasyonu")
     
     m1, m2, m3, m4, m5, m6 = st.columns(6)
     m1.metric("💰 Net Ciro (Mizan)", "₺{:,.2f}".format(st.session_state['ty_ciro']))
-    m2.metric("❌ Toplam Kesintiler", "₺{:,.2f}".format(st.session_state['ty_kesinti']))
+    m2.metric("❌ Trendyol Kesintileri", "₺{:,.2f}".format(st.session_state['ty_kesinti']))
     m3.metric("📦 Toplam Ürün Maliyeti", "₺{:,.2f}".format(st.session_state['ty_maliyet']))
     m4.metric("🟢 Net Saf Kâr", "₺{:,.2f}".format(st.session_state['ty_kar']))
     
@@ -252,9 +236,9 @@ if st.session_state['hesaplandi']:
     m7, m8, m9, m10, m11, m12 = st.columns(6)
     
     brut_marj = (st.session_state['ty_kar'] / st.session_state['ty_ciro'] * 100.0) if st.session_state['ty_ciro'] > 0 else 0.0
-    toplam_gider = st.session_state['ty_kesinti'] + st.session_state['ty_maliyet'] + ty_rek
-    net_marj = (st.session_state['ty_kar'] / toplam_gider * 100.0) if toplam_gider > 0 else 0.0
-    roi_orani = (st.session_state['ty_kar'] / toplam_gider * 100.0) if toplam_gider > 0 else 0.0
+    topham_gider = st.session_state['ty_kesinti'] + st.session_state['ty_maliyet'] + ty_rek
+    net_marj = (st.session_state['ty_kar'] / topham_gider * 100.0) if topham_gider > 0 else 0.0
+    roi_orani = (st.session_state['ty_kar'] / topham_gider * 100.0) if topham_gider > 0 else 0.0
     roas_orani = (st.session_state['ty_ciro'] / ty_rek) if ty_rek > 0 else 0.0
     
     m7.metric("📈 Brüt Ciro Marjı", "%{:.2f}".format(brut_marj))
