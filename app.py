@@ -4,9 +4,9 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.6", layout="wide")
+st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5.7", layout="wide")
 
-st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.6 (Sorunsuz Tekli Barkod)")
+st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5.7 (Hatasız Tekli Barkod)")
 st.markdown("Fiyat tavsiyeleri, reklam motoru ve tekli barkod yazdırma istasyonu entegre edilmiştir.")
 st.write("---")
 
@@ -182,11 +182,21 @@ if 'df_sonuc' in st.session_state:
             urun_bilgi = df_filtre.iloc[0]
             st.write("### 🖨️ Yazıcı Çıktı Önizlemesi")
             
-            etiket_html = f"""
-            <div style="border: 3px solid black; padding: 20px; width: 350px; background-color: white; color: black; font-family: Arial; border-radius: 5px;">
-                <h2 style="margin: 0; padding-bottom: 5px; border-bottom: 2px solid black;">{str(urun_bilgi['Marka']).upper()}</h2>
-                <p style="font-size: 14px; margin: 10px 0;"><b>Ürün:</b> {str(urun_bilgi['Ürün Adı'])[:60]}</p>
-                <div style="background-color: black; color: white; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin-top: 20px;">
-                    |||| {str(aranan_barkod)} ||||
-                </div>
-                <p style="text-align
+            # Tırnak hatasını önlemek için CSS'i düz metin formatında güvenli birleştirdik
+            m_ad = str(urun_bilgi['Marka']).upper()
+            u_ad = str(urun_bilgi['Ürün Adı'])[:60]
+            b_no = str(aranan_barkod)
+            
+            html_sablon = '<div style="border: 3px solid black; padding: 20px; width: 350px; background-color: white; color: black; font-family: Arial; border-radius: 5px;">'
+            html_sablon += '<h2 style="margin: 0; padding-bottom: 5px; border-bottom: 2px solid black;">' + m_ad + '</h2>'
+            html_sablon += '<p style="font-size: 14px; margin: 10px 0;"><b>Ürün:</b> ' + u_ad + '</p>'
+            html_sablon += '<div style="background-color: black; color: white; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin-top: 20px;">'
+            html_sablon += '|||| ' + b_no + ' ||||</div>'
+            html_sablon += '<p style="text-align: center; font-size: 12px; margin: 5px 0 0 0;">Barkod No: ' + b_no + '</p></div>'
+            
+            st.markdown(html_sablon, unsafe_allow_html=True)
+            st.info("💡 Bu tekli barkodu yazdırmak için bilgisayarınızdan **CTRL + P** tuşlarına olun. Yazıcı ayarlarından 'Yalnızca Seçimi Yazdır'ı seçerek doğrudan termal etiket çıkartabilirsiniz!")
+
+    # 💡 YAPAY ZEKA ZAM TAVSİYELERİ
+    st.write("---")
+    st.subheader("💡 Yapay Zeka Akıllı
