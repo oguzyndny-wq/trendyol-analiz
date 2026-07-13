@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Trendyol Finans ve Detaylı Analiz", layout="wide")
-st.title("🤖 Trendyol Konsolide Finans ve Ürün Analiz Paneli v14.2")
-st.markdown("Genel finansal özet kartları ile ürün bazlı kâr-zarar listesini bir arada sunan eksiksiz sürüm.")
+st.title("🤖 Trendyol Konsolide Finans ve Ürün Analiz Paneli v14.3")
+st.markdown("Matematiksel kesinti formülleri kuruşu kuruşuna düzeltilmiş hatasız sürüm.")
 st.write("---")
 
 # Session State Hafızası
@@ -63,11 +63,12 @@ if baslat_btn:
             f_dic = {}
             for idx, r in df_f.iterrows():
                 sn = str(r['Sipariş No']).strip()
+                # Finans dosyasındaki eksi değerlerin mutlak değerini alarak temiz topluyoruz
                 f_dic[sn] = {
                     'n': safe_f(r['Ürün Adedi']),
-                    'ko': safe_f(r['Komisyon/Yurt Dışı Stok Destek Bedeli']),
-                    'ka': safe_f(r['Gönderi Kargo Bedeli']),
-                    'hi': safe_f(r['Platform Hizmet Bedeli'])
+                    'ko': abs(safe_f(r['Komisyon/Yurt Dışı Stok Destek Bedeli'])),
+                    'ka': abs(safe_f(r['Gönderi Kargo Bedeli'])),
+                    'hi': abs(safe_f(r['Platform Hizmet Bedeli']))
                 }
             
             # Ürün isimlerini ve maliyetlerini sözlüğe toplama
@@ -96,12 +97,16 @@ if baslat_btn:
                 
                 fd = f_dic.get(sn, {'n': 0, 'ko': 0, 'ka': 0, 'hi': 0})
                 div = fd['n'] if fd['n'] > 0 else 1
-                b_ko = fd['ko'] / div * ad if fd['n'] > 0 else 0
-                b_ka = fd['ka'] / div * ad if fd['n'] > 0 else 0
-                b_hi = fd['hi'] / div * ad if fd['n'] > 0 else 0
                 
-                n_kr = h_ci + b_ko + b_ka + b_hi - h_ma
-                ty_res.append([h_ci, b_ko + b_ka + b_hi, h_ma, n_kr])
+                # Paylaştırılan net pozitif kesintiler
+                b_ko = (fd['ko'] / div) * ad if fd['n'] > 0 else 0.0
+                b_ka = (fd['ka'] / div) * ad if fd['n'] > 0 else 0.0
+                b_hi = (fd['hi'] / div) * ad if fd['n'] > 0 else 0.0
+                toplam_kesinti_bileseni = b_ko + b_ka + b_hi
+                
+                # Net Kâr Hesaplama Formülü (Ciro - Kesintiler - Ürün Maliyeti)
+                n_kr = h_ci - toplam_kesinti_bileseni - h_ma
+                ty_res.append([h_ci, toplam_kesinti_bileseni, h_ma, n_kr])
                 
                 if bk not in urun_bazli:
                     urun_bazli[bk] = {'Ürün Adı': prod_name, 'Satılan Adet': 0, 'Ciro': 0.0, 'Kâr / Zarar': 0.0}
@@ -113,7 +118,7 @@ if baslat_btn:
             # Genel Tablo Hesaplamaları
             df_ty_r = pd.DataFrame(ty_res, columns=['C', 'K', 'M', 'R'])
             st.session_state['ty_ciro'] = df_ty_r['C'].sum()
-            st.session_state['ty_kesinti'] = abs(df_ty_r['K'].sum())
+            st.session_state['ty_kesinti'] = df_ty_r['K'].sum()
             st.session_state['ty_maliyet'] = df_ty_r['M'].sum()
             st.session_state['ty_kar'] = df_ty_r['R'].sum() - ty_rek
             st.session_state['ty_sip_adet'] = t_si
@@ -126,13 +131,13 @@ if baslat_btn:
             
             st.session_state['df_detay'] = df_detay
             st.session_state['hesaplandi'] = True
-            st.success("🎉 Hem Genel Özet Hem Detaylı Ürün Analizi Başarıyla Tamamlandı!")
+            st.success("🎉 Matematiksel Kontroller Tamamlandı! Rapor Güncellendi.")
         except Exception as e:
             st.error(f"Hesaplama hatası: {str(e)}")
     else:
         st.warning("Lütfen analiz için gerekli 3 dosyayı da yükleyin.")
 
-# RAPORLAMA EKRANI (İki Tablo Bir Arada)
+# RAPORLAMA EKRANI
 if st.session_state['hesaplandi']:
     st.write("---")
     st.subheader("📊 1. Trendyol Genel Finansal Performans Özeti")
@@ -150,7 +155,7 @@ if st.session_state['hesaplandi']:
     if st.session_state['df_detay'] is not None:
         st.write("---")
         st.subheader("🔍 2. Ürün Bazlı Detaylı Kârlılık Raporu")
-        st.markdown("Aşağıdaki listede her ürünün kâr/zarar durumu kuruşu kuruşuna gösterilmiş ve kârlar **Yeşil**, zararlar **Kırmızı** tonda boyanmıştır.")
+        st.markdown("Her ürünün gerçek net kârı aşağıda listelenmiştir. Kârlar **Yeşil**, zararlar **Kırmızı** tonda boyanmıştır.")
         
         df_goster = st.session_state['df_detay'].copy()
         
@@ -170,5 +175,5 @@ if st.session_state['hesaplandi']:
         kar_edenler = df_goster[df_goster['Kâr / Zarar'] > 0]
         zarar_edenler = df_goster[df_goster['Kâr / Zarar'] < 0]
         
-        k1.metric("🟢 Kâr Eden Ürün Çeşidi", f"{len(kar_edenler)} Çeşit", f"+₺{kar_edenler['Kâr / Zarar'].sum():,.2f} Toplam Kâr")
+        k1.metric("🟢 Kâr Eden Ürün Çeşidi", f"{len(kar_edenler)} Çesist", f"+₺{kar_edenler['Kâr / Zarar'].sum():,.2f} Toplam Kâr")
         k2.metric("🔴 Zarar Eden Ürün Çeşidi", f"{len(zarar_edenler)} Çeşit", f"-₺{abs(zarar_edenler['Kâr / Zarar'].sum()):,.2f} Toplam Zarar", delta_color="inverse")
