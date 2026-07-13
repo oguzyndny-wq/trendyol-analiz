@@ -2,12 +2,15 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.graphics.barcode import code128
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Trendyol Ultra Kâr Analiz Paneli v4", layout="wide")
+st.set_page_config(page_title="Trendyol Akıllı Yapay Zeka Paneli v5", layout="wide")
 
-st.title("🚀 Trendyol Ultra Kâr Analiz Paneli v4 (PRO)")
-st.markdown("Zarar eden ürün alarmları, iade kargo cezaları ve detaylı gider pastası entegre edilmiştir.")
+st.title("🤖 Trendyol Akıllı Yapay Zeka Paneli v5 (AI PRO)")
+st.markdown("Fiyat tavsiyeleri, reklam verimlilik motoru ve tek tıkla barkod etiket üretici entegre edilmiştir.")
 st.write("---")
 
 # 1. DOSYA YÜKLEME ALANLARI
@@ -30,10 +33,45 @@ st.write("---")
 # Reklam Gideri Giriş Alanı
 reklam_gideri = st.number_input("🔗 Varsa Bu Aya Ait Toplam Reklam Giderini Giriş Yapın (TL):", min_value=0.0, value=0.0, step=100.0)
 
+# PDF Barkod Oluşturma Fonksiyonu
+def generate_barcode_pdf(df):
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=(283, 283)) # Yaklaşık 100x100mm termal etiket boyutu
+    
+    # Sadece satışı olan benzersiz barkodları basalım
+    unique_products = df[df['Durum'] == 'Satış'][['Barkod', 'Ürün Adı', 'Marka']].drop_duplicates()
+    
+    for idx, row in unique_products.iterrows():
+        barkod_str = str(row['Barkod']).strip()
+        urun_adi = str(row['Ürün Adı'])[:40] # Sığması için kısaltalım
+        marka = str(row['Marka'])
+        
+        # Etiket Tasarımı
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(20, 250, marka)
+        
+        p.setFont("Helvetica", 10)
+        p.drawString(20, 230, urun_adi)
+        
+        # Barkod Çizimi (Code 128)
+        try:
+            bc = code128.Code128(barkod_str, barHeight=50, barWidth=1.2)
+            bc.drawOn(p, 20, 100)
+        except:
+            p.drawString(20, 120, "[Barkod Çizilemedi]")
+            
+        p.setFont("Helvetica", 11)
+        p.drawString(20, 70, f"Barkod: {barkod_str}")
+        
+        p.showPage()
+        
+    p.save()
+    return buffer.getvalue()
+
 # ANALİZİ BAŞLAT BUTONU
-if st.button("🚀 Detaylı Analizi Başlat", use_container_width=True):
+if st.button("🚀 Akıllı Yapay Zeka Analizini Başlat", use_container_width=True):
     if finans_file and prod_file and maliyet_file:
-        with st.spinner("Şirketinizin röntgeni çekiliyor, zararlar hesaplanıyor..."):
+        with st.spinner("Yapay zeka motoru fiyatları optimize ediyor, etiketleri hazırlıyor..."):
             
             # Verileri Oku
             df_finans = pd.read_excel(finans_file)
@@ -77,11 +115,9 @@ if st.button("🚀 Detaylı Analizi Başlat", use_container_width=True):
                 if barkod == 'nan' or siparis_no == 'nan':
                     continue
                 
-                # İptal Durumu Kontrolü
                 if "iptal" in statü or "reddedildi" in statü:
                     continue
                 
-                # Maliyet Kontrolü
                 if barkod in maliyet_dict:
                     birim_maliyet = maliyet_dict[barkod]
                 else:
@@ -98,7 +134,6 @@ if st.button("🚀 Detaylı Analizi Başlat", use_container_width=True):
                     hesaplanan_ciro = satis_tutari
                     hesaplanan_maliyet = toplam_maliyet
                 
-                # Kesintileri Getir
                 bolunmus_komisyon = 0
                 bolunmus_kargo = 0
                 bolunmus_hizmet = 0
@@ -110,11 +145,9 @@ if st.button("🚀 Detaylı Analizi Başlat", use_container_width=True):
                         bolunmus_kargo = (f_data['kargo'] / f_data['toplam_adet']) * adet
                         bolunmus_hizmet = (f_data['hizmet'] / f_data['toplam_adet']) * adet
                         
-                        # Eğer iade ise yediğimiz kargo bedeli bizim için saf zarardır
                         if is_iade:
                             toplam_iade_kargo_zarari += abs(bolunmus_kargo)
                 
-                # Net Kâr Formülü
                 net_kar = hesaplanan_ciro + bolunmus_komisyon + bolunmus_kargo + bolunmus_hizmet - hesaplanan_maliyet
                 
                 sonuc_listesi.append({
@@ -134,7 +167,7 @@ if st.button("🚀 Detaylı Analizi Başlat", use_container_width=True):
                 
             df_sonuc = pd.DataFrame(sonuc_listesi)
             
-            # 📊 METRİKLER
+            # METRİKLER
             toplam_ciro = df_sonuc['Net Ciro'].sum()
             toplam_kargo = df_sonuc['Kargo'].sum()
             toplam_komisyon = df_sonuc['Komisyon'].sum()
@@ -153,59 +186,99 @@ if st.button("🚀 Detaylı Analizi Başlat", use_container_width=True):
             m3.metric("📦 Genel İade Oranı", f"%{iade_orani:.2f}")
             m4.metric("🚨 İade Kargo Zararı", f"₺{toplam_iade_kargo_zarari:,.2f}")
             
-            # 🛑 ÖZELLİK 1: ZARAR EDEN ÜRÜNLER ALARMI
-            df_urun_kar = df_sonuc.groupby(['Barkod', 'Marka', 'Ürün Adı']).agg({'Net Kâr':'sum', 'Satış Adedi':'sum'}).reset_index()
-            df_zarar_edenler = df_urun_kar[df_urun_kar['Net Kâr'] < 0].sort_values(by='Net Kâr')
-            
+            # 🛑 ÖZELLİK 1: AKILLI FİYAT OPTİMİZASYON MOTORU (ZAM TAVSİYELİ)
             st.write("---")
-            if not df_zarar_edenler.empty:
-                st.error(f"🛑 DİKKAT: Sattıkça Zarar Ettiren {len(df_zarar_edenler)} Adet Ürün Tespit Edildi! (Acil Zam Yapılmalı)")
-                st.dataframe(df_zarar_edenler.style.format({'Net Kâr': '₺{:.2f}'}), use_container_width=True)
-            else:
-                st.success("✅ Tebrikler! Sattıkça zarar ettiren hiçbir ürününüz bulunmuyor.")
+            st.subheader("💡 Yapay Zeka Akıllı Fiyatlandırma ve Zam Tavsiyeleri")
             
-            # 💸 ÖZELLİK 3: GİDER DAĞILIM PASTA GRAFİĞİ
+            df_urun_analiz = df_sonuc.groupby(['Barkod', 'Marka', 'Ürün Adı']).agg({
+                'Net Ciro': 'sum',
+                'Net Kâr': 'sum',
+                'Satış Adedi': 'sum',
+                'Komisyon': 'sum',
+                'Kargo': 'sum'
+            }).reset_index()
+            
+            tavsiye_listesi = []
+            for idx, row in df_urun_analiz.iterrows():
+                if row['Satış Adedi'] > 0:
+                    birim_ciro = row['Net Ciro'] / row['Satış Adedi']
+                    birim_kar = row['Net Kâr'] / row['Satış Adedi']
+                    birim_kesinti_orani = abs(row['Komisyon'] + row['Kargo']) / row['Net Ciro'] if row['Net Ciro'] > 0 else 0.30
+                    
+                    if birim_kar < 0:
+                        gerekli_fiyat_artisi = abs(birim_kar) * (1 + birim_kesinti_orani)
+                        tavsiye_listesi.append({
+                            "Barkod": row['Barkod'],
+                            "Marka": row['Marka'],
+                            "Ürün Adı": row['Ürün Adı'],
+                            "Mevcut Birim Kâr": f"₺{birim_kar:.2f}",
+                            "Durum": "🔴 ZARAR EDİYOR",
+                            "AI Tavsiyesi": f"Trendyol Satış Fiyatını En Az ₺{gerekli_fiyat_artisi:.2f} ARTIRMALISINIZ!"
+                        })
+                    elif birim_kar < (birim_ciro * 0.1): # Kâr marjı %10'un altındaysa uyarı ver
+                        tavsiye_listesi.append({
+                            "Barkod": row['Barkod'],
+                            "Marka": row['Marka'],
+                            "Ürün Adı": row['Ürün Adı'],
+                            "Mevcut Birim Kâr": f"₺{birim_kar:.2f}",
+                            "Durum": "🟡 DÜŞÜK KÂR",
+                            "AI Tavsiyesi": "Kâr marjınız kritik seviyede. Rekabet elveriyorsa %5 zam yapılması önerilir."
+                        })
+            
+            if tavsiye_listesi:
+                st.dataframe(pd.DataFrame(tavsiye_listesi), use_container_width=True)
+            else:
+                st.success("✅ Harika! Tüm ürünlerinizin kâr marjı sağlıklı durumda, fiyata dokunmaya gerek yok.")
+                
+            # 🎯 ÖZELLİK 3: REKLAM VERİMLİLİK MOTORU
+            if reklam_gideri > 0:
+                st.write("---")
+                st.subheader("🎯 Reklam Verimlilik Skoru (ROAS Analizörü)")
+                roas = toplam_ciro / reklam_gideri if reklam_gideri > 0 else 0
+                
+                rc1, rc2 = st.columns(2)
+                rc1.metric("🎯 Reklam Verimlilik Skoru (ROAS)", f"{roas:.2f}x", help="Harcanan her 1 TL reklamın size kaç TL ciro getirdiğini gösterir.")
+                
+                if roas >= 5:
+                    rc2.success("🔥 MÜKEMMEL: Reklam performansınız harika. Bu bütçeyle reklam vermeye devam edebilir, hatta bütçeyi artırabilirsiniz!")
+                elif roas >= 3:
+                    rc2.warning("🟡 ORTA SEVİYE: Reklam başabaş noktasında. Reklam verdiğiniz ürünlerin kâr marjını kontrol edin.")
+                else:
+                    rc2.error("🚨 KRİTİK ZARAR: Reklamınız harcadığı parayı çıkaramıyor. Reklam verdiğiniz kelimeleri veya ürünleri acilen değiştirin!")
+
+            # 💸 GİDER DAĞILIM PASTA GRAFİĞİ
             st.write("---")
             st.write("### 🍕 Toplam Cironun Gider Dağılım Röntgeni")
-            
             gider_data = {
                 "Gider Kalemi": ["Net Kâr", "Ürün Maliyetleri", "Trendyol Komisyonu", "Kargo Giderleri", "Platform Hizmet & Reklam"],
-                "Tutar": [
-                    max(0, genel_net_kar),
-                    toplam_maliyet_gideri,
-                    abs(toplam_komisyon),
-                    abs(toplam_kargo),
-                    abs(toplam_hizmet) + reklam_gideri
-                ]
+                "Tutar": [max(0, genel_net_kar), toplam_maliyet_gideri, abs(toplam_komisyon), abs(toplam_kargo), abs(toplam_hizmet) + reklam_gideri]
             }
             df_gider_pasta = pd.DataFrame(gider_data)
             fig_pie = px.pie(df_gider_pasta, values='Tutar', names='Gider Kalemi', title="Cironuzun Dağılım Tablosu (%)", hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
             
-            # 🏢 Marka Analizi
+            # 🖨️ ÖZELLİK 4: TEK TIKLA BARKOD ETİKETİ ÜRETİCİ
             st.write("---")
-            st.write("### 🏢 Marka Bazlı Detaylı Performans")
-            df_marka = df_sonuc.groupby('Marka').agg({'Net Ciro':'sum', 'Net Kâr':'sum', 'Satış Adedi':'sum'}).reset_index()
-            st.dataframe(df_marka.style.format({'Net Ciro': '₺{:.2f}', 'Net Kâr': '₺{:.2f}'}), use_container_width=True)
-            
-            # 🔍 EKSİK MALİYET DEDEKTİFİ
-            if eksik_maliyetler:
-                st.write("---")
-                st.warning("⚠️ Maliyet Listesinde Olmadığı İçin Kârı Yanıltan Barkodlar:")
-                df_eksik = pd.DataFrame(list(eksik_maliyetler), columns=["Barkod", "Ürün Adı"])
-                st.dataframe(df_eksik, use_container_width=True)
+            st.subheader("🖨️ Operasyon ve Paketleme Kolaylığı")
+            pdf_data = generate_barcode_pdf(df_sonuc)
+            st.download_button(
+                label="🖨️ Satılan Ürünlerin Barkod Etiketlerini İndir (Termal Yazıcı İçin Hazır PDF)",
+                data=pdf_data,
+                file_name="Satilan_Urun_Barkod_Etiketleri.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
             
             # Excel İndirme
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_sonuc.to_excel(writer, index=False, sheet_name='Ultra Analiz v4')
+                df_sonuc.to_excel(writer, index=False, sheet_name='AI Pro Raporu v5')
             processed_data = output.getvalue()
             
-            st.write("---")
             st.download_button(
-                label="📥 Tüm Profesyonel Raporları Excel Olarak İndir",
+                label="📥 Tüm Sonuçları Detaylı Excel Olarak İndir",
                 data=processed_data,
-                file_name="Trendyol_Ultra_Analiz_v4.xlsx",
+                file_name="Trendyol_AI_Analizi_v5.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
