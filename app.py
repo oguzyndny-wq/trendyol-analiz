@@ -4,8 +4,8 @@ import datetime
 
 st.set_page_config(page_title="Konsolide ERP Premium", layout="wide")
 
-# 📊 CEO EXECUTIVE DESIGN - GELİŞMİŞ CSS ARAYÜZ CİLASI
-st.markdown("""
+# 🎨 🎯 KESİN ÇÖZÜM: st.markdown yerine st.html kullanarak Python 3.14 çakışmasını engelliyoruz
+st.html("""
     <style>
     /* Ana Arka Plan ve Yazı Tipi */
     .stApp {
@@ -47,10 +47,6 @@ st.markdown("""
         font-size: 24px !important;
         font-weight: 700 !important;
     }
-    /* Başabaş Noktası Kutusu Citası */
-    div[data-testid="stForm"], .element-container div.stAlert {
-        border-radius: 12px !important;
-    }
     /* Tab Tasarımları (Trendyol / Amazon Sekmeleri) */
     .stTabs [data-baseweb="tab"] {
         font-size: 15px !important;
@@ -86,7 +82,7 @@ st.markdown("""
         transform: scale(1.01);
     }
     </style>
-""", unsafe_html=True)
+""")
 
 st.markdown('<p class="main-title">💼 TRENDYOL & AMAZON KONSOLİDE ERP & EXECUTIVE BI PANEL</p>', unsafe_html=True)
 st.markdown("<p style='color: #8ecae6; margin-top:-10px;'>Şirketler Grubu Finansal Yönetim, Nakit Akışı, Lojistik Kırılım ve Performans Denetim Merkezi</p>", unsafe_html=True)
@@ -323,7 +319,7 @@ if baslat_btn:
             
             amz_gosterge_listesi = []
             for idx, r_amz in df_am.iterrows():
-                asin_kod = str(r_amz['Ana ürün ASIN\'i']).strip()
+                asin_kod = r_amz['Ana ürün ASIN\'i']
                 s_adet = safe_f(r_amz['Satilan_Net_Birim'])
                 ciro_temiz = safe_f(r_amz['Brut_Satis'])
                 kazanc_temiz = safe_f(r_amz['Amazon_Net_Kazanc'])
@@ -412,7 +408,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             if st.session_state['eksik_barkodlar_ty']:
                 st.error(f"⚠️ MALİYETİ OLMAYAN TRENDYOL BARKODLARI: {', '.join(st.session_state['eksik_barkodlar_ty'])}")
             
-            # 🚨 ALARM: Trendyol Ölü Ürün Alarmları Tablosu
+            # ALARM: Trendyol Ölü Ürün Alarmları Tablosu
             if st.session_state['df_olu_urunler_ty'] is not None:
                 st.markdown("### 🚨 Kritik Müdahale Gereken Ölü Ürünler Alarmı (Trendyol)")
                 st.dataframe(st.session_state['df_olu_urunler_ty'].style.format({'Net Kâr / Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Net Kâr / Zarar']), use_container_width=True, height=150)
@@ -453,7 +449,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             
     with s_amz:
         if st.session_state['hesaplandi_amz']:
-            # 🚨 ALARM: Amazon Zarar Eden Ürün Alarmları Tablosu
+            # ALARM: Amazon Zarar Eden Ürün Alarmları Tablosu
             if st.session_state['df_olu_urunler_amz'] is not None:
                 st.markdown("### 🚨 Kritik Müdahale Gereken Ölü Ürünler Alarmı (Amazon)")
                 st.dataframe(st.session_state['df_olu_urunler_amz'].style.format({'Ciro': '₺{:,.2f}', 'Net Kâr / Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Net Kâr / Zarar']), use_container_width=True, height=150)
