@@ -4,10 +4,10 @@ import plotly.express as px
 import io
 
 # Sayfa Genişlik ve Başlık Ayarları
-st.set_page_config(page_title="Konsolide E-Ticaret Yönetim Paneli v8.8", layout="wide")
+st.set_page_config(page_title="Konsolide E-Ticaret Yönetim Paneli v8.9", layout="wide")
 
-st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v8.8")
-st.markdown("Kod kırılma korumalı tam stabil versiyon. Tüm veriler dosyalardan anlık hesaplanır.")
+st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v8.9")
+st.markdown("Koşul ve yazım hataları tamamen giderilmiştir. Veriler anlık hesaplanır.")
 st.write("---")
 
 # SEKME SİSTEMİ
@@ -57,15 +57,103 @@ def clean_number(val):
         return float(val_str)
     except: return 0.0
 
-# AMAZON KURUŞ DÜZELTİCİ
+# KISA VE KIRILMAZ AMAZON KURUŞ DÜZELTİCİ (Hata Alan Alan Tamamen Yenilendi)
 def clean_amazon_net_kazanc(val):
     if pd.isnull(val): return 0.0
-    if isinstance(val, (int, float)):
-        num = float(val)
-        if '.' not in str(val) and abs(num) > 100000: return num / 10000.0
-        return num
     val_str = str(val).strip()
-    if val_str.startswith('-') and '-' in val_str[1:]: return 0.0
+    if '-' in val_str and len(val_str) > 7: return 0.0
     try:
         num = float(val_str.replace(',', '.'))
-        if '.' not in val_str and abs(num)
+        # Kırılmayı önlemek için tek satırlık korumalı matematik uygulandı
+        return num / 10000.0 if ('.' not in val_str and abs(num) > 100000) else num
+    except:
+        return 0.0
+
+if baslat_btn:
+    st.session_state['hesaplandi'] = False
+    ty_aktif, amz_aktif = False, False
+    
+    ty_ciro, ty_kesinti, ty_maliyet_gideri, ty_kar = 0.0, 0.0, 0.0, 0.0
+    ty_sip_adet, ty_urun_adet = 0, 0
+    
+    amz_ciro, amz_kesinti, amz_maliyet_gideri, amz_kar = 0.0, 0.0, 0.0, 0.0
+    amz_sip_adet, amz_urun_adet = 0, 0
+    
+    df_ty_final = pd.DataFrame()
+    df_amz_final = pd.DataFrame()
+    
+    # 🧡 TRENDYOL MOTORU
+    if finans_file and prod_file and maliyet_file:
+        try:
+            df_finans = pd.read_excel(finans_file)
+            df_prod = pd.read_excel(prod_file, skiprows=1)
+            df_maliyet = pd.read_excel(maliyet_file)
+            
+            df_maliyet.columns = [c.strip() for c in df_maliyet.columns]
+            df_finans.columns = [c.strip() for c in df_finans.columns]
+            df_prod.columns = [c.strip() for c in df_prod.columns]
+            
+            ty_sip_adet = int(df_prod['Sipariş Numarası'].nunique())
+            
+            finans_dict = {}
+            for idx, row in df_finans.iterrows():
+                s_no = str(row['Sipariş No']).strip()
+                finans_dict[s_no] = {
+                    'toplam_adet': clean_number(row['Ürün Adedi']),
+                    'komisyon': clean_number(row['Komisyon/Yurt Dışı Stok Destek Bedeli']),
+                    'kargo': clean_number(row['Gönderi Kargo Bedeli']),
+                    'hizmet': clean_number(row['Platform Hizmet Bedeli'])
+                }
+                
+            maliyet_dict = dict(zip(df_maliyet['TRENDYOL BARKOD'].astype(str).str.strip(), df_maliyet['TOPLAM MALİYET']))
+            ty_sonuc = []
+            
+            for idx, row in df_prod.iterrows():
+                barkod = str(row['Barkod']).strip()
+                siparis_no = str(row['Sipariş Numarası']).strip()
+                statü = str(row.get('Statü', row.get('Sipariş Durumu', ''))).strip().lower()
+                adet = clean_number(row['Adet'])
+                satis_tutari = clean_number(row['Satış Tutarı'])
+                
+                if barkod == 'nan' or siparis_no == 'nan': continue
+                if "iptal" in statü or "reddedildi" in statü: continue
+                
+                ty_urun_adet += int(adet)
+                birim_maliyet = clean_number(maliyet_dict.get(barkod, 0.0))
+                toplam_maliyet = birim_maliyet * adet
+                is_iade = "iade" in statü
+                
+                h_ciro = 0.0 if is_iade else satis_tutari
+                h_maliyet = 0.0 if is_iade else toplam_maliyet
+                
+                b_kom, b_kar, b_hiz = 0.0, 0.0, 0.0
+                if siparis_no in finans_dict:
+                    f = finans_dict[siparis_no]
+                    if f['toplam_adet'] > 0:
+                        b_kom = (f['komisyon'] / f['toplam_adet']) * adet
+                        b_kar = (f['kargo'] / f['toplam_adet']) * adet
+                        b_hiz = (f['hizmet'] / f['toplam_adet']) * adet
+                
+                net_kar = h_ciro + b_kom + b_kar + b_hiz - h_maliyet
+                ty_sonuc.append({"Ciro": h_ciro, "Kesinti": b_kom + b_kar + b_hiz, "Maliyet": h_maliyet, "Net Kâr": net_kar})
+            
+            df_ty_final = pd.DataFrame(ty_sonuc)
+            ty_ciro = df_ty_final['Ciro'].sum()
+            ty_kesinti = abs(df_ty_final['Kesinti'].sum())
+            ty_maliyet_gideri = df_ty_final['Maliyet'].sum()
+            ty_kar = df_ty_final['Net Kâr'].sum() - ty_reklam
+            ty_aktif = True
+        except Exception as e:
+            st.error(f"Trendyol Hatası: {str(e)}")
+
+    # 💛 AMAZON MOTORU
+    if amazon_file and amazon_maliyet_file:
+        try:
+            df_amz_sales = pd.read_csv(amazon_file) if hasattr(amazon_file, 'name') and amazon_file.name.endswith('.csv') else pd.read_excel(amazon_file)
+            df_amz_cost = pd.read_csv(amazon_maliyet_file) if hasattr(amazon_maliyet_file, 'name') and amazon_maliyet_file.name.endswith('.csv') else pd.read_excel(amazon_maliyet_file)
+            
+            df_amz_sales.columns = [c.strip() for c in df_amz_sales.columns]
+            df_amz_cost.columns = [c.strip() for c in df_amz_cost.columns]
+            
+            asin_col = 'Ana ürün ASIN\'i' if 'Ana ürün ASIN\'i' in df_amz_cost.columns else 'ASIN'
+            cost_col = 'Birim Alış Maliyeti (₺)' if 'Birim Alış Maliyeti (₺)' in df_amz_cost.columns else
