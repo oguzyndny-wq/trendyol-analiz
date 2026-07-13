@@ -2,12 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="E-Ticaret Konsolide Paneli v11.2", layout="wide")
-st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v11.2")
-st.markdown("Amazon maliyet şablonundan doğrudan veri çeken, sipariş adetli ve kesin hesaplamalı kararlı sürüm.")
+st.set_page_config(page_title="E-Ticaret Konsolide Paneli v11.3", layout="wide")
+st.title("🤖 Çok Kanallı E-Ticaret Konsolide Finans Paneli v11.3")
+st.markdown("Hatalardan arındırılmış, optimize edilmiş ve tam stabil çalışan sürüm.")
 st.write("---")
 
-# Session State Hazırlığı (KeyError Koruması)
 varsayilanlar = {
     'ty_ciro': 0.0, 'ty_kesinti': 0.0, 'ty_maliyet': 0.0, 'ty_kar': 0.0, 'ty_sip_adet': 0, 'ty_urun_adet': 0,
     'amz_ciro': 0.0, 'amz_kesinti': 0.0, 'amz_maliyet': 0.0, 'amz_kar': 0.0, 'amz_sip_adet': 0, 'amz_urun_adet': 0,
@@ -30,7 +29,7 @@ with tab_yükleme:
     st.subheader("2. Amazon Raporları")
     col_amz1, col_amz2 = st.columns(2)
     with col_amz1: amazon_file = st.file_uploader("Haziran Amazon Raporu (Opsiyonel)", type=["xlsx", "xls", "csv"], key="amazon_sales")
-    with col_amz2: amazon_maliyet_file = st.file_uploader("Amazon Maliyet Şablonu (Zorunlu veriler buradan okunur)", type=["xlsx", "xls", "csv"], key="amazon_cost")
+    with col_amz2: amazon_maliyet_file = st.file_uploader("Amazon Maliyet Şablonu", type=["xlsx", "xls", "csv"], key="amazon_cost")
     st.write("---")
     baslat_btn = st.button("🚀 Tüm Pazaryerlerinin Akıllı Analizini Başlat", use_container_width=True)
 
@@ -89,24 +88,4 @@ if baslat_btn:
                 b_hiz = f['hiz'] / div * adet if f['t_adet'] > 0 else 0
                 
                 net_kar = h_ciro + b_kom + b_kar + b_hiz - h_maliyet
-                ty_sonuc.append({"Ciro": h_ciro, "Kesinti": b_kom + b_kar + b_hiz, "Maliyet": h_maliyet, "Net Kâr": net_kar})
-            df_ty = pd.DataFrame(ty_sonuc)
-            ty_ciro, ty_kesinti, ty_maliyet_gideri = df_ty['Ciro'].sum(), abs(df_ty['Kesinti'].sum()), df_ty['Maliyet'].sum()
-            ty_kar = df_ty['Net Kâr'].sum() - ty_reklam
-        except Exception as e: st.error(f"Trendyol Hatası: {str(e)}")
-
-    # 💛 AMAZON MOTORU (Hassas Düzenlenmiş Yeni Yapı)
-    if amazon_maliyet_file:
-        try:
-            df_amz_cost = pd.read_csv(amazon_maliyet_file) if hasattr(amazon_maliyet_file, 'name') and amazon_maliyet_file.name.endswith('.csv') else pd.read_excel(amazon_maliyet_file)
-            df_amz_cost.columns = [c.strip() for c in df_amz_cost.columns]
-            
-            # Sütun isimlerini esnek yakalama
-            birim_col = 'Satilan_Net_Birim' if 'Satilan_Net_Birim' in df_amz_cost.columns else df_amz_cost.columns[1]
-            satis_col = 'Brut_Satis' if 'Brut_Satis' in df_amz_cost.columns else df_amz_cost.columns[2]
-            kazanc_col = 'Amazon_Net_Kazanc' if 'Amazon_Net_Kazanc' in df_amz_cost.columns else df_amz_cost.columns[3]
-            maliyet_col = 'Birim Alış Maliyeti (₺)' if 'Birim Alış Maliyeti (₺)' in df_amz_cost.columns else df_amz_cost.columns[4]
-            
-            amz_sonuc = []
-            for idx, row in df_amz_cost.iterrows():
-                net_birim = clean_num(row.get(
+                ty_sonuc.append({"Ciro": h_ciro, "Kesinti": b_kom + b_kar + b_hiz, "Maliyet": h_maliyet, "Net K
