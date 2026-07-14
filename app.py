@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import io
 
-st.set_page_config(page_title="PRİME ENTEGRE ERP v33.0", layout="wide")
+st.set_page_config(page_title="PRİME ENTEGRE ERP v34.0", layout="wide")
 st.title("📈 PRİME ENTEGRE E-TİCARET LTD. ŞTİ. — Konsolide Nakit Akışı ve Finansal Denetim İstasyonu")
 st.markdown("Prime Entegre bünyesindeki tüm pazaryerlerinin anlık kârlılık, finansal başabaş analizi, lojistik maliyet ve holding performans göstergeleri.")
 st.write("---")
@@ -51,14 +51,7 @@ for k in v_list:
 
 # 📥 HAM VERİ GİRİŞÜ TERMINALI
 st.subheader("📥 Finansal Rapor Giriş Paneli & Veri Entegrasyonu")
-col_map1, col_map2 = st.columns([2, 1])
-with col_map1:
-    mapping_file = st.file_uploader("🔗 0. Çok Kanallı Ürün Eşleştirme Kılavuzu (urun_eslestirme.xlsx)", type=["xlsx", "xls"])
-with col_map2:
-    st.write(" ")
-    st.write(" ")
-    # Eğer henüz kılavuz dosya yoksa, kullanıcının işini kolaylaştıracak sihirbaz taslağını üretiyoruz
-    st.markdown("💡 *Henüz kılavuzunuz yoksa raporları yükleyip başlattıktan sonra aşağıda belirecek olan hazır asistan şablonunu bilgisayarınıza indirebilirsiniz.*")
+mapping_file = st.file_uploader("🔗 0. Çoklu Barkod Ürün Eşleştirme Kılavuzu (urun_eslestirme_taslagi (1).xlsx)", type=["xlsx", "xls"])
 
 tab_ty, tab_amz = st.tabs(["🟢 TRENDYOL RAPORLARI", "🟠 AMAZON RAPORLARI"])
 
@@ -234,7 +227,6 @@ if baslat_btn:
             st.session_state['amz_iade_adet'] = int(df_as['İade edilen birimler'].sum() if 'İade edilen birimler' in df_as.columns else 0)
             st.session_state['amz_iptal_adet'] = 0
             
-            # Ürün Bazlı Tablo
             df_am_detay = df_am[['Ana ürün ASIN\'i', 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc', 'Birim Alış Maliyeti (₺)', 'Mal_Maliyet']].copy()
             df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon_Net_Kazanc'] - df_am_detay['Mal_Maliyet']
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Toplam Ürün Maliyeti', 'Kâr / Zarar']
@@ -298,7 +290,7 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
     cc3.metric("🛒 Ortak Sepet Ortalaması", "₺{:.2f}".format(g_sepet))
     cc4.metric("💵 Ortak Sipariş Başı Kâr", "₺{:.2f}".format(g_sip_kar))
     
-    # 📉 Sabit Gider Amortisman Denetimi
+    # 📉 Dinamik Başabaş Noktası Analizi
     st.write(" ")
     st.markdown("### 💸 2. Asgari Ciro Hedefi & Sabit Gider Amortisman Denetimi")
     with st.container(border=True):
@@ -312,15 +304,12 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             
             with col_be2:
                 st.metric("🎯 Batmamak İçin Gereken Minimum Aylık Ciro", "₺{:,.2f}".format(gereken_aylik_ciro))
-                st.caption(f"Dükkanın genel net kâr marjı (%{g_marj:.2f}) baz alınarak hesaplanmıştır.")
             with col_be3:
                 st.metric("📅 Günlük Minimum Ciro Barajı", "₺{:,.2f}".format(gereken_gunluk_ciro))
                 if total_ciro >= gereken_aylik_ciro:
                     st.success("🟢 Tebrikler! Mevcut konsolide cironuz sabit gider barajını şimdiden aşmış durumda.")
                 else:
                     st.warning(f"🚨 Baraj Altındasınız! Sabit giderlerinizi kurtarmak için en az ₺{gereken_aylik_ciro - total_ciro:,.2f} ciroya daha ihtiyacınız var.")
-        else:
-            st.info("Başabaş noktasının hesaplanabilmesi için sistemde artı bakiye kâr marjı oluşmalıdır.")
 
     # 📊 Görsel Grafikler Sekmesi
     st.write(" ")
@@ -335,85 +324,71 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             chart_data_gider = pd.DataFrame({'Gider Kalemi': ['Hizmet/Kargo/Kesinti', 'Ürün Alış Sermayesi', 'Reklam/Pazarlama'], 'Tutar': [total_kesinti, total_maliyet, total_reklam]})
             st.bar_chart(chart_data_gider, x='Gider Kalemi', y='Tutar', color='#e67e22')
 
-    # 🚨 👑 MODÜL: ÇOK KANALLI KONSOLİDE ÜRÜN BİRLEŞTİRME MATRİSİ
+    # 🚨 👑 MODÜL: ÇOKLU BARKOD DESTEKLİ ÇOK KANALLI KONSOLİDE ÜRÜN BİRLEŞTİRME MATRİSİ
     st.write(" ")
     st.markdown("### 👑 3. Çok Kanallı (Omnichannel) Ürün Konsolide Kârlılık Matrisi")
     
-    # Adım 1: Kullanıcı için asistan taslağını oluşturacak malzeme listesini topluyoruz
-    ty_b_list = list(st.session_state['df_detay_ty']['Barkod'].unique()) if st.session_state['df_detay_ty'] is not None else []
-    amz_a_list = list(st.session_state['df_detay_amz']['ASIN'].unique()) if st.session_state['df_detay_amz'] is not None else []
-    max_len = max(len(ty_b_list), len(amz_a_list))
-    
-    # Listeleri eşitlemek için boştakileri dolduruyoruz
-    ty_b_list += [""] * (max_len - len(ty_b_list))
-    amz_a_list += [""] * (max_len - len(amz_a_list))
-    
-    df_taslak_sihirbaz = pd.DataFrame({
-        'ORTAK_URUN_STOK_KODU': [f"URUN_{i+1}" for i in range(max_len)],
-        'TRENDYOL_BARKOD': ty_b_list,
-        'AMAZON_ASIN': amz_a_list
-    })
-    
-    # Taslağı Excel byte akışına çeviriyoruz
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df_taslak_sihirbaz.to_excel(writer, sheet_name='Eşleştirme Sayfası', index=False)
-    
-    # Butonu ekrana basıyoruz
-    st.download_button(
-        label="📥 EŞLEŞTİRME SİHİRBAZI DOSYASINI İNDİR (İşinizi Kolaylaştıracak Taslak)",
-        data=buffer.getvalue(),
-        file_name="urun_eslestirme_taslagi.xlsx",
-        mime="application/vnd.ms-excel"
-    )
-    
-    # Adım 2: Eğer kılavuz yüklenmişse birleştirilmiş ana mizan tablosunu üretiyoruz
     if mapping_file is not None:
         try:
             df_map = pd.read_excel(mapping_file)
             df_map.columns = [c.strip() for c in df_map.columns]
             
-            # Sözlük haritalarını kuruyoruz
-            ty_to_sku = dict(zip(df_map['TRENDYOL_BARKOD'].astype(str).str.strip(), df_map['ORTAK_URUN_STOK_KODU']))
-            amz_to_sku = dict(zip(df_map['AMAZON_ASIN'].astype(str).str.strip(), df_map['ORTAK_URUN_STOK_KODU']))
+            # 💡 YENİ YAPIDAKİ SİHİRLİ TARAYICI: Her bir yan yana barkodu tek bir merkez koda bağlıyoruz
+            code_to_sku = {}
+            sku_names = {}
+            
+            barkod_sutunlari = [c for c in df_map.columns if 'barkod' in c.lower() or 'Barkod' in c]
+            
+            for idx, r_map in df_map.iterrows():
+                main_sku = str(r_map['ORTAK_URUN_STOK_KODU']).strip()
+                p_name = str(r_map.get('Ürün Adı', main_sku)).strip()
+                sku_names[main_sku] = p_name
+                
+                for b_col in barkod_sutunlari:
+                    val = str(r_map[b_col]).strip()
+                    if val != 'nan' and val != "":
+                        code_to_sku[val] = main_sku
             
             sku_aggr = {}
             
-            # Trendyol verilerini ekliyoruz
+            # 🟢 Trendyol Veri Akışı Bağlantısı
             if st.session_state['df_detay_ty'] is not None:
                 for idx, r_ty in st.session_state['df_detay_ty'].iterrows():
                     b_kod = str(r_ty['Barkod']).strip()
-                    sku = ty_to_sku.get(b_kod, f"Eşleşmemiş Trendyol ({b_kod})")
-                    if sku not in sku_aggr: sku_aggr[sku] = {'Ürün Adı / SKU': sku, 'Trendyol Adet': 0, 'Trendyol Ciro': 0.0, 'Trendyol Net Kâr': 0.0, 'Amazon Adet': 0, 'Amazon Ciro': 0.0, 'Amazon Net Kâr': 0.0}
-                    sku_aggr[sku]['Trendyol Adet'] += int(r_ty['Satılan Adet'])
+                    sku = code_to_sku.get(b_kod, f"Eşleşmemiş Trendyol ({b_kod})")
+                    if sku not in sku_aggr: sku_aggr[sku] = {'Ortak Stok Kodu': sku, 'Ürün Tanımı': sku_names.get(sku, r_ty['Ürün Adı']), 'Trendyol Satış Adet': 0, 'Trendyol Ciro': 0.0, 'Trendyol Net Kâr': 0.0, 'Amazon Satış Adet': 0, 'Amazon Ciro': 0.0, 'Amazon Net Kâr': 0.0}
+                    sku_aggr[sku]['Trendyol Satış Adet'] += int(r_ty['Satılan Adet'])
                     sku_aggr[sku]['Trendyol Ciro'] += safe_f(r_ty['Ciro'])
                     sku_aggr[sku]['Trendyol Net Kâr'] += safe_f(r_ty['Kâr / Zarar'])
                     
-            # Amazon verilerini ekliyoruz
+            # 🟠 Amazon Veri Akışı Bağlantısı
             if st.session_state['df_detay_amz'] is not None:
                 for idx, r_amz in st.session_state['df_detay_amz'].iterrows():
                     asin_kod = str(r_amz['ASIN']).strip()
-                    sku = amz_to_sku.get(asin_kod, f"Eşleşmemiş Amazon ({asin_kod})")
-                    if sku not in sku_aggr: sku_aggr[sku] = {'Ürün Adı / SKU': sku, 'Trendyol Adet': 0, 'Trendyol Ciro': 0.0, 'Trendyol Net Kâr': 0.0, 'Amazon Adet': 0, 'Amazon Ciro': 0.0, 'Amazon Net Kâr': 0.0}
-                    sku_aggr[sku]['Amazon Adet'] += int(r_amz['Satılan Adet'])
+                    sku = code_to_sku.get(asin_kod, f"Eşleşmemiş Amazon ({asin_kod})")
+                    if sku not in sku_aggr: sku_aggr[sku] = {'Ortak Stok Kodu': sku, 'Ürün Tanımı': sku_names.get(sku, r_amz['Ürün Adı']), 'Trendyol Satış Adet': 0, 'Trendyol Ciro': 0.0, 'Trendyol Net Kâr': 0.0, 'Amazon Satış Adet': 0, 'Amazon Ciro': 0.0, 'Amazon Net Kâr': 0.0}
+                    sku_aggr[sku]['Amazon Satış Adet'] += int(r_amz['Satılan Adet'])
                     sku_aggr[sku]['Amazon Ciro'] += safe_f(r_amz['Ciro'])
                     sku_aggr[sku]['Amazon Net Kâr'] += safe_f(r_amz['Kâr / Zarar'])
             
             df_konsolide_sku = pd.DataFrame(list(sku_aggr.values()))
-            df_konsolide_sku['Toplam Ortak Adet'] = df_konsolide_sku['Trendyol Adet'] + df_konsolide_sku['Amazon Adet']
+            df_konsolide_sku['Toplam Ortak Satış'] = df_konsolide_sku['Trendyol Satış Adet'] + df_konsolide_sku['Amazon Satış Adet']
             df_konsolide_sku['Toplam Ortak Ciro'] = df_konsolide_sku['Trendyol Ciro'] + df_konsolide_sku['Amazon Ciro']
-            df_konsolide_sku['Global Konsolide Net Kâr'] = df_konsolide_sku['Trendyol Net Kâr'] + df_konsolide_sku['Amazon Net Kâr']
+            df_konsolide_sku['Konsolide Global Net Kâr'] = df_konsolide_sku['Trendyol Net Kâr'] + df_konsolide_sku['Amazon Net Kâr']
+            
+            # Sütun düzenini göze hoş gelen sıraya koyuyoruz
+            df_konsolide_sku = df_konsolide_sku[['Ortak Stok Kodu', 'Ürün Tanımı', 'Trendyol Satış Adet', 'Trendyol Ciro', 'Amazon Satış Adet', 'Amazon Ciro', 'Toplam Ortak Satış', 'Toplam Ortak Ciro', 'Konsolide Global Net Kâr']]
             
             st.dataframe(df_konsolide_sku.style.format({
                 'Trendyol Ciro': '₺{:,.2f}', 'Trendyol Net Kâr': '₺{:,.2f}',
                 'Amazon Ciro': '₺{:,.2f}', 'Amazon Net Kâr': '₺{:,.2f}',
-                'Toplam Ortak Ciro': '₺{:,.2f}', 'Global Konsolide Net Kâr': '₺{:,.2f}'
-            }).map(color_profit_loss, subset=['Global Konsolide Net Kâr']), use_container_width=True)
+                'Toplam Ortak Ciro': '₺{:,.2f}', 'Konsolide Global Net Kâr': '₺{:,.2f}'
+            }).map(color_profit_loss, subset=['Konsolide Global Net Kâr']), use_container_width=True)
             
         except Exception as e:
-            st.error(f"Kılavuz Dosya Okuma Hatası: {str(e)}. Lütfen sütun isimlerinin ORTAK_URUN_STOK_KODU, TRENDYOL_BARKOD ve AMAZON_ASIN olduğundan emin olun.")
+            st.error(f"Kılavuz Dosya Haritalama Hatası: {str(e)}. Lütfen dosyanızdaki sütun isimlerinin tam olarak uyuştuğundan emin olun.")
     else:
-        st.info("💡 Yukarıdaki '0' numaralı alana 'urun_eslestirme.xlsx' dosyanızı yüklediğinizde, iki mağazayı birleştiren dev birleşik kârlılık matrisi buraya gelecektir.")
+        st.info("💡 Yukarıdaki '0' numaralı alana hazırladığınız yeni çoklu barkodlu 'urun_eslestirme_taslagi (1).xlsx' dosyasını yüklediğinizde, yan yana barkodları tarayan birleşik mizan tablosu buraya otomatik gelecektir.")
 
     st.write("---")
     s_ty, s_amz = st.tabs(["🟢 TRENDYOL DETAYLI ERP PANELİ", "🟠 AMAZON DETAYLI ERP PANELİ"])
@@ -433,7 +408,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             ty_marj = (st.session_state['ty_kar'] / st.session_state['ty_ciro'] * 100.0) if st.session_state['ty_ciro'] > 0 else 0.0
             ty_sepet = st.session_state['ty_ciro'] / st.session_state['ty_sip_adet'] if st.session_state['ty_sip_adet'] > 0 else 0.0
             ty_sip_k = st.session_state['ty_kar'] / st.session_state['ty_sip_adet'] if st.session_state['ty_sip_adet'] > 0 else 0.0
-            ty_roas = (st.session_state['ty_ciro'] / ty_rek) if ty_rek > 0 else 0.0
             
             m1, m2, m3, m4, m5 = st.columns(5)
             m1.metric("Net Ciro", "₺{:,.2f}".format(st.session_state['ty_ciro']))
