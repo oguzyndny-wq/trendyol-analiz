@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import io
 
-st.set_page_config(page_title="PRİME ENTEGRE ERP v34.1", layout="wide")
+st.set_page_config(page_title="PRİME ENTEGRE ERP v34.2", layout="wide")
 st.title("📈 PRİME ENTEGRE E-TİCARET LTD. ŞTİ. — Konsolide Nakit Akışı ve Finansal Denetim İstasyonu")
 st.markdown("Prime Entegre bünyesindeki tüm pazaryerlerinin anlık kârlılık, finansal başabaş analizi, lojistik maliyet ve holding performans göstergeleri.")
 st.write("---")
@@ -450,12 +450,14 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             a4.metric("🚫 İptal / 🔄 İade", f"{st.session_state['amz_iptal_adet']} / {st.session_state['amz_iade_adet']} Adet")
             
             st.write(" ")
-            aa1, aa2, aa3, aa4 = st.columns(4)
-            # 🎯 YAMA NOKTASI: Değişkenler lokal calc değerlerine atanarak NameError hatası tamamen engellendi.
+            aa1, aa2, aa3, aa4, aa5, aa6 = st.columns(6)
+            # 🎯 YAMA & EKLEME NOKTASI: Trendyol ile simetrik 6'lı kart yapısı kuruldu.
             aa1.metric("📊 Yatırım Getirisi (ROI)", "%{:.2f}".format(amz_roi_calc))
             aa2.metric("📈 Net Kâr Marjı (%)", "%{:.2f}".format(amz_marj_calc))
-            aa3.metric("🛒 Sipariş Alan Ürün Çeşidi (ASIN)", f"{st.session_state['amz_sip_adet']} Çeşit Ürün")
-            aa4.metric("📦 Toplam Satılan Net Ürün Adedi", f"{int(st.session_state['amz_urun_adet'])} Adet")
+            aa3.metric("🛒 Sepet Ortalaması", "₺{:.2f}".format(amz_sepet))
+            aa4.metric("💵 Sipariş Başı Kâr", "₺{:.2f}".format(amz_sip_k))
+            aa5.metric("🛒 Toplam Sipariş Adedi", f"{st.session_state['amz_sip_adet']} Sipariş")
+            aa6.metric("📦 Toplam Ürün Adedi", f"{int(st.session_state['amz_urun_adet'])} Adet")
             
             st.markdown("#### 🔍 Amazon Doğrulanmış Resmi Gider Analiz Kartları")
             g1, g2, g3 = st.columns(3)
