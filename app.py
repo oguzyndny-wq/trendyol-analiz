@@ -4,31 +4,27 @@ import datetime
 import io
 import os
 
-st.set_page_config(page_title="PRİME ENTEGRE ERP v35.2", layout="wide")
+st.set_page_config(page_title="PRİME ENTEGRE ERP v35.3", layout="wide")
 
 # 🖼️ KURUMSAL LOGO ENTEGRASYON YÖNETİCİSİ
-# app.py dosyanızın yanına logo.png (veya logo.jpg) dosyanızı koymanız yeterlidir.
-LOGO_PATH = "logo.png"  # Buraya logonuzun adını yazabilirsiniz (örn: logo.jpg)
+LOGO_PATH = "logo.png"
 
-# 1. Seçenek: Sol Menü (Sidebar) Üstüne Logo Yerleştirme
 if os.path.exists(LOGO_PATH):
     st.sidebar.image(LOGO_PATH, use_container_width=True)
     st.sidebar.write("---")
 
-# Ana Başlık Alanı
 col_title, col_logo = st.columns([8, 2])
 with col_title:
     st.title("📈 PRİME ENTEGRE E-TİCARET LTD. ŞTİ. — Konsolide Nakit Akışı ve Finansal Denetim İstasyonu")
-    st.markdown("Prime Entegre bünyesindeki tüm pazaryerlerinin anlık kârlılık, finansal başabaş analizi, lojistik maliyet and holding performans göstergeleri.")
+    st.markdown("Prime Entegre bünyesindeki tüm pazaryerlerinin anlık kârlılık, finansal başabaş analizi, lojistik maliyet ve holding performans göstergeleri.")
 
 with col_logo:
-    # 2. Seçenek: Sağ Üst Köşeye Logo Yerleştirme (Alternatif)
     if os.path.exists(LOGO_PATH):
         st.image(LOGO_PATH, width=150)
 
 st.write("---")
 
-# Sayı Temizleme Fonksiyonu
+# Sayı Temizleme Fonksiyonları
 def safe_f(v):
     if pd.isnull(v): return 0.0
     if isinstance(v, (int, float)): return float(v)
@@ -37,12 +33,17 @@ def safe_f(v):
 
 def parse_amazon_clean(val, force_int=False):
     if pd.isnull(val): return 0.0
-    s = str(val).strip().replace(' ', '')
+    s = str(val).strip().replace(' ', '').replace('₺', '')
     if '-' in s and ':' in s:
         try: return float(s.split('-')[0][:4])
         except: return 0.0
     try:
-        num = float(s.replace(',', '.'))
+        # Binlik ve ondalık ayırıcı düzeltmesi
+        if '.' in s and ',' in s:
+            s = s.replace('.', '').replace(',', '.')
+        elif ',' in s:
+            s = s.replace(',', '.')
+        num = float(s)
         if not force_int and abs(num) > 100000:
             return num / 10000.0
         return num
@@ -69,7 +70,7 @@ for k in v_list:
         elif 'hesaplandi' in k: st.session_state[k] = False
         else: st.session_state[k] = 0.0
 
-# 📥 HAM VERİ GİRİŞÜ TERMINALI
+# 📥 HAM VERİ GİRİŞ TERMİNALİ
 st.subheader("📥 Finansal Rapor Giriş Paneli & Veri Entegrasyonu")
 mapping_file = st.file_uploader("🔗 0. Çoklu Barkod Ürün Eşleştirme Kılavuzu (urun_eslestirme_taslagi (1).xlsx)", type=["xlsx", "xls"])
 
@@ -84,7 +85,7 @@ with tab_ty:
 
 with tab_amz:
     col_a1, col_a2 = st.columns(2)
-    with col_a1: amz_sip_file = st.file_uploader("1. Haziran Amazon (Sipariş Kayıtları) Dosyası", type=["xlsx", "xls"], key="s_amz")
+    with col_a1: amz_sip_file = st.file_uploader("1. Amazon Satış Kayıtları Dosyası (CSV veya XLSX desteklenir)", type=["csv", "xlsx", "xls"], key="s_amz")
     with col_a2: amz_mal_file = st.file_uploader("2. Amazon Haziran Maliyet Şablonu", type=["xlsx", "xls"], key="m_amz")
     amz_rek = st.number_input("🔗 Amazon Panel Dışı Harici Reklam Gideri (TL):", min_value=0.0, value=0.0, step=100.0)
 
@@ -212,13 +213,29 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Trendyol Motor Hatası: {str(e)}")
 
-    # 🟠 2. AMAZON HESAPLAMA MOTORU
+    # 🟠 2. AMAZON HESAPLAMA MOTORU (Dinamik CSV & Excel Akıllı Adaptör)
     if amz_sip_file and amz_mal_file:
         try:
-            df_as = pd.read_excel(amz_sip_file)
+            # 📁 AKILLI FORMAT SEÇİCİ DETEKTÖR
+            if amz_sip_file.name.endswith('.csv'):
+                df_as = pd.read_csv(amz_sip_file)
+            else:
+                df_as = pd.read_excel(amz_sip_file)
+                
             df_am = pd.read_excel(amz_mal_file)
             df_as.columns = [c.strip() for c in df_as.columns]
             df_am.columns = [c.strip() for c in df_am.columns]
+            
+            # 🔄 CSV ve Excel sütun dinamik haritalaması
+            asin_col = "Ana ürün ASIN'i" if "Ana ürün ASIN'i" in df_am.columns else df_am.columns[0]
+            
+            # Eğer yüklenen dosya ham CSV ise, verileri mizan şablonuna göre hizala
+            if "(Ana Ürün) ASIN" in df_as.columns:
+                df_as.rename(columns={
+                    "(Ana Ürün) ASIN": "Ana ürün ASIN'i",
+                    "Sipariş edilen birimler": "Satilan_Net_Birim",
+                    "Sipariş edilen ürün satışları": "Brut_Satis"
+                }, inplace=True)
             
             amz_c = df_am['Brut_Satis'].sum()
             amz_k_net = df_am['Amazon_Net_Kazanc'].sum()
@@ -235,9 +252,9 @@ if baslat_btn:
             st.session_state['amz_maliyet'] = amz_m
             st.session_state['amz_kar'] = amz_k_net - amz_m - amz_rek
             
-            satilan_birimler_col = [c for c in df_as.columns if 'Satılan birimler' in c or 'Satilan birimler' in c]
+            satilan_birimler_col = [c for c in df_as.columns if 'Satılan birimler' in c or 'Satilan birimler' in c or 'Satilan_Net_Birim' in c]
             if satilan_birimler_col:
-                st.session_state['amz_sip_adet'] = int(df_as[satilan_birimler_col[0]].sum())
+                st.session_state['amz_sip_adet'] = int(parse_amazon_clean(df_as[satilan_birimler_col[0]].sum(), force_int=True))
             else:
                 st.session_state['amz_sip_adet'] = int(df_am['Satilan_Net_Birim'].sum())
                 
@@ -245,7 +262,7 @@ if baslat_btn:
             st.session_state['amz_iade_adet'] = int(df_as['İade edilen birimler'].sum() if 'İade edilen birimler' in df_as.columns else 0)
             st.session_state['amz_iptal_adet'] = 0
             
-            df_am_detay = df_am[['Ana ürün ASIN\'i', 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc', 'Birim Alış Maliyeti (₺)', 'Mal_Maliyet']].copy()
+            df_am_detay = df_am[[asin_col, 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc', 'Birim Alış Maliyeti (₺)', 'Mal_Maliyet']].copy()
             df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon_Net_Kazanc'] - df_am_detay['Mal_Maliyet']
             df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Toplam Ürün Maliyeti', 'Kâr / Zarar']
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
@@ -259,7 +276,7 @@ if baslat_btn:
             
             amz_gosterge_listesi = []
             for idx, r_amz in df_am.iterrows():
-                asin_kod = r_amz['Ana ürün ASIN\'i']
+                asin_kod = r_amz[asin_col]
                 s_adet = safe_f(r_amz['Satilan_Net_Birim'])
                 ciro_temiz = safe_f(r_amz['Brut_Satis'])
                 kazanc_temiz = safe_f(r_amz['Amazon_Net_Kazanc'])
@@ -274,7 +291,7 @@ if baslat_btn:
             st.session_state['df_siparisler_amz'] = pd.DataFrame(amz_gosterge_listesi).sort_values(by='Toplam Kâr/Zarar', ascending=False).reset_index(drop=True)
             st.session_state['hesaplandi_amz'] = True
         except Exception as e:
-            st.error(f"Amazon Motoru Hatası: {str(e)}")
+            st.error(f"Amazon Akıllı Motor Hatası: {str(e)}")
 
 # 👑 KONSOLİDE GLOBAL PERFORMANCE GÖSTERGELERI
 if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
@@ -379,7 +396,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
                 for idx, r_amz in st.session_state['df_detay_amz'].iterrows():
                     asin_kod = str(r_amz['ASIN']).strip()
                     sku = code_to_sku.get(asin_kod, f"Eşleşmemiş Amazon ({asin_kod})")
-                    # 💡 YAMA NOKTASI: Eksik süslü parantez kapatılarak SyntaxError tamamen engellendi.
                     if sku not in sku_aggr: sku_aggr[sku] = {'Ortak Stok Kodu': sku, 'Ürün Tanımı': sku_names.get(sku, r_amz['Ürün Adı']), 'Trendyol Satış Adet': 0, 'Trendyol Ciro': 0.0, 'Trendyol Net Kâr': 0.0, 'Amazon Satış Adet': 0, 'Amazon Ciro': 0.0, 'Amazon Net Kâr': 0.0}
                     sku_aggr[sku]['Amazon Satış Adet'] += int(r_amz['Satılan Adet'])
                     sku_aggr[sku]['Amazon Ciro'] += safe_f(r_amz['Ciro'])
