@@ -213,10 +213,10 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Trendyol Motor Hatası: {str(e)}")
 
-    # 🟠 2. AMAZON HESAPLAMA MOTORU
+    # 🟠 2. AMAZON HESAPLAMA MOTORU (Canlı Veri Hesabı)
     if amz_sip_file and amz_mal_file:
         try:
-            # 💡 CSV / TXT VEYA EXCEL KONTROLÜ
+            # 1. KUTUDAN CANLI RAPORU OKU (CSV veya XLSX)
             fname_as = amz_sip_file.name.lower()
             if fname_as.endswith('.csv'):
                 try: df_as = pd.read_csv(amz_sip_file)
@@ -226,16 +226,63 @@ if baslat_btn:
             else:
                 df_as = pd.read_excel(amz_sip_file)
 
+            # 2. KUTUDAN BİRİM MALİYET LİSTESİNİ OKU
             df_am = pd.read_excel(amz_mal_file)
-            df_as.columns = [c.strip() for c in df_as.columns]
-            df_am.columns = [c.strip() for c in df_am.columns]
             
-            amz_c = df_am['Brut_Satis'].sum()
-            amz_k_net = df_am['Amazon_Net_Kazanc'].sum()
-            df_am['Mal_Maliyet'] = df_am['Satilan_Net_Birim'] * df_am['Birim Alış Maliyeti (₺)']
-            amz_m = df_am['Mal_Maliyet'].sum()
-            amz_karsi_kesinti = amz_c - amz_k_net
+            df_as.columns = [str(c).strip() for c in df_as.columns]
+            df_am.columns = [str(c).strip() for c in df_am.columns]
             
+            # Birim Maliyet Sözlüğü (ASIN -> Alış Fiyatı)
+            asin_cost_col = 'Ana ürün ASIN\'i' if 'Ana ürün ASIN\'i' in df_am.columns else df_am.columns[0]
+            cost_col = 'Birim Alış Maliyeti (₺)' if 'Birim Alış Maliyeti (₺)' in df_am.columns else df_am.columns[-1]
+            cost_dict = dict(zip(df_am[asin_cost_col].astype(str).str.strip(), df_am[cost_col].apply(safe_f)))
+
+            # Eğer 1. kutudaki dosya 608 sütunluk canlı report_...xlsx raporu ise:
+            if df_as.shape[1] > 20 or 'Report' in str(amz_sip_file.name):
+                df_as_clean = df_as.iloc[2:].copy()
+                col_asin = df_as.columns[0]
+                col_name = df_as.columns[2]
+                col_net_odeme = df_as.columns[5]
+                col_toplam_satis = df_as.columns[13]
+                col_satilan_birim = df_as.columns[17]
+                
+                # Canlı Hesaplama
+                amz_c = pd.to_numeric(df_as_clean[col_toplam_satis], errors='coerce').sum()
+                amz_k_net = pd.to_numeric(df_as_clean[col_net_odeme], errors='coerce').sum()
+                
+                # Maliyetleri 2. kutudaki şablondan eşleştir
+                df_as_clean['Birim_Maliyet'] = df_as_clean[col_asin].astype(str).str.strip().map(cost_dict).fillna(42.0)
+                amz_m = (pd.to_numeric(df_as_clean[col_satilan_birim], errors='coerce') * df_as_clean['Birim_Maliyet']).sum()
+                amz_karsi_kesinti = amz_c - amz_k_net
+                
+                st.session_state['amz_urun_adet'] = int(pd.to_numeric(df_as_clean[col_satilan_birim], errors='coerce').sum())
+                st.session_state['amz_sip_adet'] = int(pd.to_numeric(df_as_clean[col_satilan_birim], errors='coerce').sum())
+                
+                df_am_detay = pd.DataFrame()
+                df_am_detay['ASIN'] = df_as_clean[col_asin]
+                df_am_detay['Ürün Adı'] = df_as_clean[col_name]
+                df_am_detay['Satılan Adet'] = pd.to_numeric(df_as_clean[col_satilan_birim], errors='coerce')
+                df_am_detay['Ciro'] = pd.to_numeric(df_as_clean[col_toplam_satis], errors='coerce')
+                df_am_detay['Amazon Net Kazanç'] = pd.to_numeric(df_as_clean[col_net_odeme], errors='coerce')
+                df_am_detay['Birim Alış Maliyeti'] = df_as_clean['Birim_Maliyet']
+                df_am_detay['Toplam Ürün Maliyeti'] = df_am_detay['Satılan Adet'] * df_am_detay['Birim Alış Maliyeti']
+                df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon Net Kazanç'] - df_am_detay['Toplam Ürün Maliyeti']
+            else:
+                # Standart şablon
+                amz_c = df_as['Brut_Satis'].sum()
+                amz_k_net = df_as['Amazon_Net_Kazanc'].sum()
+                df_as['Mal_Maliyet'] = df_as['Satilan_Net_Birim'] * df_as['Ana ürün ASIN\'i'].astype(str).str.strip().map(cost_dict).fillna(42.0)
+                amz_m = df_as['Mal_Maliyet'].sum()
+                amz_karsi_kesinti = amz_c - amz_k_net
+                st.session_state['amz_urun_adet'] = int(df_as['Satilan_Net_Birim'].sum())
+                st.session_state['amz_sip_adet'] = int(df_as['Satilan_Net_Birim'].sum())
+                
+                df_am_detay = df_as[['Ana ürün ASIN\'i', 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc']].copy()
+                df_am_detay['Birim Alış Maliyeti'] = df_as['Ana ürün ASIN\'i'].astype(str).str.strip().map(cost_dict).fillna(42.0)
+                df_am_detay['Toplam Ürün Maliyeti'] = df_as['Mal_Maliyet']
+                df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon_Net_Kazanc'] - df_am_detay['Toplam Ürün Maliyeti']
+
+            # Session State Güncelleme
             st.session_state['amz_resmi_lojistik'] = amz_karsi_kesinti * 0.33827
             st.session_state['amz_resmi_komisyon'] = amz_karsi_kesinti * 0.66173
             st.session_state['amz_resmi_hakedis'] = amz_k_net
@@ -244,49 +291,13 @@ if baslat_btn:
             st.session_state['amz_kesinti'] = amz_karsi_kesinti
             st.session_state['amz_maliyet'] = amz_m
             st.session_state['amz_kar'] = amz_k_net - amz_m - amz_rek
-            
-            satilan_birimler_col = [c for c in df_as.columns if 'Satılan birimler' in c or 'Satilan birimler' in c or 'Sipariş edilen birimler' in c]
-            if satilan_birimler_col:
-                st.session_state['amz_sip_adet'] = int(df_as[satilan_birimler_col[0]].sum())
-            elif 'quantity' in df_as.columns:
-                st.session_state['amz_sip_adet'] = int(df_as['quantity'].sum())
-            else:
-                st.session_state['amz_sip_adet'] = int(df_am['Satilan_Net_Birim'].sum())
-                
-            st.session_state['amz_urun_adet'] = int(df_am['Satilan_Net_Birim'].sum())
-            st.session_state['amz_iade_adet'] = int(df_as['İade edilen birimler'].sum() if 'İade edilen birimler' in df_as.columns else 0)
+            st.session_state['amz_iade_adet'] = 0
             st.session_state['amz_iptal_adet'] = 0
             
-            df_am_detay = df_am[['Ana ürün ASIN\'i', 'Ürün Adı', 'Satilan_Net_Birim', 'Brut_Satis', 'Amazon_Net_Kazanc', 'Birim Alış Maliyeti (₺)', 'Mal_Maliyet']].copy()
-            df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon_Net_Kazanc'] - df_am_detay['Mal_Maliyet']
-            df_am_detay.columns = ['ASIN', 'Ürün Adı', 'Satılan Adet', 'Ciro', 'Amazon Net Kazanç', 'Birim Alış Maliyeti', 'Toplam Ürün Maliyeti', 'Kâr / Zarar']
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
-            
-            olu_data_amz = []
-            for idx, r_olu in df_am_detay.iterrows():
-                if r_olu['Kâr / Zarar'] < 0:
-                    olu_data_amz.append({'ASIN': r_olu['ASIN'], 'Ürün Adı': r_olu['Ürün Adı'], 'Satılan Adet': r_olu['Satılan Adet'], 'Ciro': r_olu['Ciro'], 'Net Kâr / Zarar': r_olu['Kâr / Zarar']})
-            if olu_data_amz: st.session_state['df_olu_urunler_amz'] = pd.DataFrame(olu_data_amz).sort_values(by='Net Kâr / Zarar').reset_index(drop=True)
-            else: st.session_state['df_olu_urunler_amz'] = None
-            
-            amz_gosterge_listesi = []
-            for idx, r_amz in df_am.iterrows():
-                asin_kod = r_amz['Ana ürün ASIN\'i']
-                s_adet = safe_f(r_amz['Satilan_Net_Birim'])
-                ciro_temiz = safe_f(r_amz['Brut_Satis'])
-                kazanc_temiz = safe_f(r_amz['Amazon_Net_Kazanc'])
-                maliyet_temiz = safe_f(r_amz['Mal_Maliyet'])
-                kar_temiz = kazanc_temiz - maliyet_temiz
-                
-                amz_gosterge_listesi.append({
-                    'ASIN/Barkod': asin_kod, 'Net Satış Adedi': int(s_adet), 'Ciro (Brüt)': ciro_temiz,
-                    'Amazon Net Kazanç': kazanc_temiz, 'Alış Maliyeti': maliyet_temiz, 'Toplam Kâr/Zarar': kar_temiz
-                })
-                
-            st.session_state['df_siparisler_amz'] = pd.DataFrame(amz_gosterge_listesi).sort_values(by='Toplam Kâr/Zarar', ascending=False).reset_index(drop=True)
             st.session_state['hesaplandi_amz'] = True
         except Exception as e:
-            st.error(f"Amazon Motoru Hatası: {str(e)}")
+            st.error(f"Amazon Canlı Motor Hatası: {str(e)}")
 
 # 👑 KONSOLİDE GLOBAL PERFORMANCE GÖSTERGELERI
 if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
