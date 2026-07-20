@@ -84,8 +84,8 @@ with tab_ty:
 
 with tab_amz:
     col_a1, col_a2 = st.columns(2)
-    # 💡 CSV & TXT EKLENDİ
-    with col_a1: amz_sip_file = st.file_uploader("1. Amazon Sipariş Kayıtları Dosyası (CSV, TXT, XLSX)", type=["csv", "txt", "xlsx", "xls"], key="s_amz")
+    # 💡 CSV, TXT ve XLSX BİRLİKTE EKLENDİ
+    with col_a1: amz_sip_file = st.file_uploader("1. Amazon Sipariş / SKU Kayıtları Dosyası (CSV, TXT, XLSX)", type=["csv", "txt", "xlsx", "xls"], key="s_amz")
     with col_a2: amz_mal_file = st.file_uploader("2. Amazon Maliyet Şablonu", type=["xlsx", "xls"], key="m_amz")
     amz_rek = st.number_input("🔗 Amazon Panel Dışı Harici Reklam Gideri (TL):", min_value=0.0, value=0.0, step=100.0)
 
@@ -213,10 +213,10 @@ if baslat_btn:
         except Exception as e:
             st.error(f"Trendyol Motor Hatası: {str(e)}")
 
-  # 🟠 2. AMAZON HESAPLAMA MOTORU (Tortuga & CSV Tam Uyumlu Canlı Motor)
+    # 🟠 2. AMAZON HESAPLAMA MOTORU (Tortuga & CSV Tam Uyumlu Canlı Motor)
     if amz_sip_file and amz_mal_file:
         try:
-            # 1. KUTUDAN CANLI RAPORU OKU (CSV veya XLSX)
+            # 1. KUTUDAN CANLI RAPORU OKU (CSV, TXT veya XLSX)
             fname_as = amz_sip_file.name.lower()
             if fname_as.endswith('.csv'):
                 try: df_as = pd.read_csv(amz_sip_file)
@@ -243,7 +243,7 @@ if baslat_btn:
             col_units = "Satılan net birim sayısı" if "Satılan net birim sayısı" in df_as.columns else ("Satılan birimler" if "Satılan birimler" in df_as.columns else "Satilan_Net_Birim")
             col_net = "Toplam Net kazanç" if "Toplam Net kazanç" in df_as.columns else "Amazon_Net_Kazanc"
             
-            # Canlı İstatistikler
+            # Canlı İstatistikler (Seçilen Aydan)
             amz_c = safe_f(pd.to_numeric(df_as[col_sales], errors='coerce').sum())
             amz_k_net = safe_f(pd.to_numeric(df_as[col_net], errors='coerce').sum()) if col_net in df_as.columns else amz_c * 0.70
             
@@ -268,6 +268,7 @@ if baslat_btn:
             st.session_state['amz_iade_adet'] = int(df_as['İade edilen birimler'].sum() if 'İade edilen birimler' in df_as.columns else 0)
             st.session_state['amz_iptal_adet'] = 0
             
+            # Detaylı Performans Tablosu
             df_am_detay = pd.DataFrame()
             df_am_detay['ASIN'] = df_as[col_asin]
             df_am_detay['Ürün Adı'] = df_as['Başlık'] if 'Başlık' in df_as.columns else df_as[col_asin]
@@ -279,6 +280,23 @@ if baslat_btn:
             df_am_detay['Kâr / Zarar'] = df_am_detay['Amazon Net Kazanç'] - df_am_detay['Toplam Ürün Maliyeti']
             
             st.session_state['df_detay_amz'] = df_am_detay.sort_values(by='Kâr / Zarar', ascending=False).reset_index(drop=True)
+            
+            # 💡 SİPARİŞ DETAY ANALİZ LİSTESİ DOLDURMA (AttributeError Düzeltmesi)
+            st.session_state['df_siparisler_amz'] = df_am_detay.rename(columns={
+                'ASIN': 'ASIN/Barkod',
+                'Satılan Adet': 'Net Satış Adedi',
+                'Ciro': 'Ciro (Brüt)',
+                'Toplam Ürün Maliyeti': 'Alış Maliyeti',
+                'Kâr / Zarar': 'Toplam Kâr/Zarar'
+            })[['ASIN/Barkod', 'Net Satış Adedi', 'Ciro (Brüt)', 'Amazon Net Kazanç', 'Alış Maliyeti', 'Toplam Kâr/Zarar']].sort_values(by='Toplam Kâr/Zarar', ascending=False).reset_index(drop=True)
+
+            olu_data_amz = []
+            for idx, r_olu in df_am_detay.iterrows():
+                if r_olu['Kâr / Zarar'] < 0:
+                    olu_data_amz.append({'ASIN': r_olu['ASIN'], 'Ürün Adı': r_olu['Ürün Adı'], 'Satılan Adet': r_olu['Satılan Adet'], 'Ciro': r_olu['Ciro'], 'Net Kâr / Zarar': r_olu['Kâr / Zarar']})
+            if olu_data_amz: st.session_state['df_olu_urunler_amz'] = pd.DataFrame(olu_data_amz).sort_values(by='Net Kâr / Zarar').reset_index(drop=True)
+            else: st.session_state['df_olu_urunler_amz'] = None
+            
             st.session_state['hesaplandi_amz'] = True
         except Exception as e:
             st.error(f"Amazon Canlı Motor Hatası: {str(e)}")
@@ -494,5 +512,6 @@ if st.session_state['hesaplandi_ty'] or st.session_state['hesaplandi_amz']:
             with sekme_amz1:
                 st.dataframe(st.session_state['df_detay_amz'].style.format({'Ciro': '₺{:,.2f}', 'Kâr / Zarar': '₺{:,.2f}', 'Birim Alış Maliyeti': '₺{:,.2f}', 'Amazon Net Kazanç': '₺{:,.2f}', 'Toplam Ürün Maliyeti': '₺{:,.2f}'}).map(color_profit_loss, subset=['Kâr / Zarar']), use_container_width=True, height=400)
             with sekme_amz2:
-                st.dataframe(st.session_state['df_siparisler_amz'].style.format({'Ciro (Brüt)': '₺{:,.2f}', 'Amazon Net Kazanç': '₺{:,.2f}', 'Alış Maliyeti': '₺{:,.2f}', 'Toplam Kâr/Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Toplam Kâr/Zarar']), use_container_width=True, height=400)
+                if st.session_state['df_siparisler_amz'] is not None and isinstance(st.session_state['df_siparisler_amz'], pd.DataFrame):
+                    st.dataframe(st.session_state['df_siparisler_amz'].style.format({'Ciro (Brüt)': '₺{:,.2f}', 'Amazon Net Kazanç': '₺{:,.2f}', 'Alış Maliyeti': '₺{:,.2f}', 'Toplam Kâr/Zarar': '₺{:,.2f}'}).map(color_profit_loss, subset=['Toplam Kâr/Zarar']), use_container_width=True, height=400)
         else: st.info("Amazon Raporları Henüz Yüklenmedi.")
