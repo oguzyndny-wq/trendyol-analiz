@@ -84,9 +84,9 @@ with tab_ty:
 
 with tab_amz:
     col_a1, col_a2 = st.columns(2)
-    # 💡 CSV VE TXT DESTEĞİ EKLENDİ
-    with col_a1: amz_sip_file = st.file_uploader("1. Haziran Amazon (Sipariş Kayıtları) Dosyası", type=["csv", "txt", "xlsx", "xls"], key="s_amz")
-    with col_a2: amz_mal_file = st.file_uploader("2. Amazon Haziran Maliyet Şablonu", type=["xlsx", "xls"], key="m_amz")
+    # 💡 CSV & TXT EKLENDİ
+    with col_a1: amz_sip_file = st.file_uploader("1. Amazon Sipariş Kayıtları Dosyası (CSV, TXT, XLSX)", type=["csv", "txt", "xlsx", "xls"], key="s_amz")
+    with col_a2: amz_mal_file = st.file_uploader("2. Amazon Maliyet Şablonu", type=["xlsx", "xls"], key="m_amz")
     amz_rek = st.number_input("🔗 Amazon Panel Dışı Harici Reklam Gideri (TL):", min_value=0.0, value=0.0, step=100.0)
 
 st.write("---")
@@ -216,14 +216,11 @@ if baslat_btn:
     # 🟠 2. AMAZON HESAPLAMA MOTORU
     if amz_sip_file and amz_mal_file:
         try:
-            # 💡 CSV & TXT VE EXCEL FORMATINI OTOMATİK ALGILAYAN YAMA
+            # 💡 CSV / TXT VEYA EXCEL KONTROLÜ
             fname_as = amz_sip_file.name.lower()
             if fname_as.endswith('.csv'):
-                try:
-                    df_as = pd.read_csv(amz_sip_file)
-                except Exception:
-                    amz_sip_file.seek(0)
-                    df_as = pd.read_csv(amz_sip_file, sep=';')
+                try: df_as = pd.read_csv(amz_sip_file)
+                except Exception: amz_sip_file.seek(0); df_as = pd.read_csv(amz_sip_file, sep=';')
             elif fname_as.endswith('.txt'):
                 df_as = pd.read_csv(amz_sip_file, sep='\t')
             else:
